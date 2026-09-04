@@ -76,10 +76,17 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      - name: Determine version
+        id: version
+        run: echo "name=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Rename debug APK
+        run: mv app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/itflow-internal-it-${{ steps.version.outputs.name }}-debug.apk"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: itflow-beta-${{ github.sha }}
+          name: itflow-internal-it-${{ steps.version.outputs.name }}-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
@@ -133,6 +140,13 @@ jobs:
             -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Determine version
+        id: version
+        run: echo "name=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Rename release APK
+        run: mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/itflow-internal-it-${{ steps.version.outputs.name }}-release.apk"
 
       - name: Attach release APK to GitHub Release
         uses: softprops/action-gh-release@v2
