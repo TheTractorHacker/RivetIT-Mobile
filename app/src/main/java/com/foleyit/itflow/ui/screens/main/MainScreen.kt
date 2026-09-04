@@ -78,6 +78,7 @@ fun MainScreen(
     var userName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
     var hasUnreadNotifications by remember { mutableStateOf(false) }
+    var billingNavEnabled by remember { mutableStateOf(false) }
 
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
     val isDarkMode = when (themeMode) {
@@ -94,6 +95,9 @@ fun MainScreen(
         } catch (_: Exception) {
             // Chrome badge only — a failed fetch here shouldn't block rendering the screen.
         }
+        // Fail-closed (hidden) on error or against a server that doesn't send `modules` yet.
+        billingNavEnabled = runCatching { ApiClient.profile() }.getOrNull()?.modules
+            ?.let { it.accountingEnabled || it.ticketChargesEnabled } ?: false
     }
 
     fun closeDrawerAndNavigate(route: String) {
@@ -144,6 +148,7 @@ fun MainScreen(
                 userName = userName,
                 userEmail = userEmail,
                 hasUnreadNotifications = hasUnreadNotifications,
+                billingNavEnabled = billingNavEnabled,
                 isDarkMode = isDarkMode,
                 onToggleDarkMode = { dark -> scope.launch { prefs.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT) } },
                 onNavigate = ::closeDrawerAndNavigate,

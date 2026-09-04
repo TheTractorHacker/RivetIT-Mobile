@@ -144,6 +144,7 @@ fun AppDrawerContent(
     userName: String,
     userEmail: String,
     hasUnreadNotifications: Boolean,
+    billingNavEnabled: Boolean = false,
     isDarkMode: Boolean,
     onToggleDarkMode: (Boolean) -> Unit,
     onNavigate: (String) -> Unit,
@@ -217,18 +218,24 @@ fun AppDrawerContent(
                 label = { Text("Credentials") }, icon = { DrawerLeadingIcon(Icons.Outlined.Lock) },
                 selected = false, onClick = { onNavigate(Screen.Credentials.route) }, modifier = DrawerItemPadding,
             )
-            NavigationDrawerItem(
-                label = { Text("Quotes") }, icon = { DrawerLeadingIcon(Icons.Outlined.RequestQuote) },
-                selected = false, onClick = { onNavigate(Screen.Quotes.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Invoices") }, icon = { DrawerLeadingIcon(Icons.AutoMirrored.Outlined.ReceiptLong) },
-                selected = false, onClick = { onNavigate(Screen.Invoices.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Expenses") }, icon = { DrawerLeadingIcon(Icons.Outlined.Payments) },
-                selected = false, onClick = { onNavigate(Screen.Expenses.route) }, modifier = DrawerItemPadding,
-            )
+            // Hidden entirely when the server has both billing modules disabled (matches
+            // agent/includes/side_nav.php's config_module_enable_accounting ||
+            // config_module_enable_ticket_charges convention) - defaults hidden (fail-closed)
+            // until the /me fetch confirms a module is actually on.
+            if (billingNavEnabled) {
+                NavigationDrawerItem(
+                    label = { Text("Quotes") }, icon = { DrawerLeadingIcon(Icons.Outlined.RequestQuote) },
+                    selected = false, onClick = { onNavigate(Screen.Quotes.route) }, modifier = DrawerItemPadding,
+                )
+                NavigationDrawerItem(
+                    label = { Text("Invoices") }, icon = { DrawerLeadingIcon(Icons.AutoMirrored.Outlined.ReceiptLong) },
+                    selected = false, onClick = { onNavigate(Screen.Invoices.route) }, modifier = DrawerItemPadding,
+                )
+                NavigationDrawerItem(
+                    label = { Text("Expenses") }, icon = { DrawerLeadingIcon(Icons.Outlined.Payments) },
+                    selected = false, onClick = { onNavigate(Screen.Expenses.route) }, modifier = DrawerItemPadding,
+                )
+            }
         }
 
         HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 12.dp))

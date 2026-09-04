@@ -66,6 +66,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     var worksheets by remember { mutableStateOf<List<WorksheetSummary>>(emptyList()) }
     var outtakes by remember { mutableStateOf<List<OuttakeSummary>>(emptyList()) }
     var refresh by remember { mutableIntStateOf(0) }
+    var chargesEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(timerRunning) {
         if (timerRunning) {
@@ -89,6 +90,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
         scope.launch {
             state = runCatching { ApiClient.service().getTicket(id) }
             charges = runCatching { ApiClient.service().getTicketCharges(id) }.getOrNull()
+            chargesEnabled = runCatching { ApiClient.profile() }.getOrNull()?.modules?.ticketChargesEnabled ?: false
             worksheets = runCatching { ApiClient.service().getTicketWorksheets(id) }.getOrDefault(emptyList())
             outtakes = runCatching { ApiClient.service().getTicketOuttakes(id) }.getOrDefault(emptyList())
             if (statuses.isEmpty()) {
@@ -402,15 +404,19 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         }
                     }
 
-                    // Charges
-                    item {
-                        ChargesCard(charges, onSaveCharge = { name, desc, qty, price ->
-                            scope.launch {
-                                runCatching { ApiClient.service().addCharge(id, AddChargeRequest(name, desc, qty, price)) }
-                                    .onSuccess { load() }
-                                    .onFailure { snackbar.showSnackbar("Failed to add charge: ${userMessage(it)}") }
-                            }
-                        })
+                    // Charges - hidden entirely when the server has ticket charges disabled
+                    // (config_module_enable_ticket_charges), matching agent/ticket.php's own
+                    // gating of this section, not just the add-charge affordance.
+                    if (chargesEnabled) {
+                        item {
+                            ChargesCard(charges, onSaveCharge = { name, desc, qty, price ->
+                                scope.launch {
+                                    runCatching { ApiClient.service().addCharge(id, AddChargeRequest(name, desc, qty, price)) }
+                                        .onSuccess { load() }
+                                        .onFailure { snackbar.showSnackbar("Failed to add charge: ${userMessage(it)}") }
+                                }
+                            })
+                        }
                     }
 
                     // Worksheets + Outtake Forms (separate sections)

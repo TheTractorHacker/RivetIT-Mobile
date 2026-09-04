@@ -278,9 +278,14 @@ data class SignRequest(
 data class CompleteWorksheetRequest(val completed: Boolean)
 
 // ── Profile ──────────────────────────────────────────────────────────────────
+data class ModuleFlags(
+    @SerializedName("accounting_enabled") val accountingEnabled: Boolean = false,
+    @SerializedName("ticket_charges_enabled") val ticketChargesEnabled: Boolean = false,
+)
 data class UserProfile(
     val id: Int, val name: String, val email: String,
-    val type: Int, val color: String?, val avatar: String?
+    val type: Int, val color: String?, val avatar: String?,
+    val modules: ModuleFlags? = null
 )
 
 data class AddChargeRequest(

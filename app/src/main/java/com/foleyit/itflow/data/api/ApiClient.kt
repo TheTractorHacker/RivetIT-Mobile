@@ -21,6 +21,7 @@ object ApiClient {
     private var _trustedCertSha: String? = null
     private var _service: ApiService? = null
     private var _appContext: Context? = null
+    private var _cachedProfile: UserProfile? = null
 
     val serverUrl get() = _serverUrl
 
@@ -31,14 +32,21 @@ object ApiClient {
         _token = token
         _trustedCertSha = trustedCertSha
         context?.let { _appContext = it.applicationContext }
+        _cachedProfile = null
         _service = buildService()
     }
 
-    fun setToken(token: String) { _token = token; _service = buildService() }
-    fun clearToken() { _token = null; _service = buildService() }
+    fun setToken(token: String) { _token = token; _cachedProfile = null; _service = buildService() }
+    fun clearToken() { _token = null; _cachedProfile = null; _service = buildService() }
     fun setTrustedCert(sha: String?) { _trustedCertSha = sha; _service = buildService() }
 
     fun service(): ApiService = _service ?: error("ApiClient not initialized")
+
+    // Session-scoped cache: /me is now read from several places (drawer, ticket detail) to
+    // check module flags, not just the profile screen - fetch once per session instead of
+    // once per screen. Invalidated in init()/setToken()/clearToken() so switching accounts
+    // never leaks the previous user's cached profile/module flags.
+    suspend fun profile(): UserProfile = _cachedProfile ?: service().getProfile().also { _cachedProfile = it }
 
     private fun isOnline(): Boolean {
         val ctx = _appContext ?: return true
