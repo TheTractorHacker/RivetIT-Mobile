@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +21,9 @@ import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.AssetSummary
 import com.foleyit.itflow.data.api.ClientSummary
+import com.foleyit.itflow.data.api.Contact
+import com.foleyit.itflow.data.api.CredentialSummary
+import com.foleyit.itflow.data.api.KbArticleSearchResult
 import com.foleyit.itflow.data.api.SearchResult
 import com.foleyit.itflow.data.api.TicketSummary
 import com.foleyit.itflow.ui.components.EmptyScreen
@@ -90,7 +94,8 @@ fun SearchScreen(navController: NavController) {
         }
     ) { padding ->
         val r = result
-        val hasResults = r != null && (r.tickets.isNotEmpty() || r.clients.isNotEmpty() || r.assets.isNotEmpty())
+        val hasResults = r != null && (r.tickets.isNotEmpty() || r.clients.isNotEmpty() || r.assets.isNotEmpty() ||
+            r.contacts.isNotEmpty() || r.credentials.isNotEmpty() || r.articles.isNotEmpty())
         when {
             loading -> LoadingScreen()
             error != null -> ErrorScreen(error ?: "Something went wrong")
@@ -119,6 +124,26 @@ fun SearchScreen(navController: NavController) {
                         item { SectionHeader("Assets", Icons.Outlined.Devices) }
                         items(rr.assets) { a ->
                             AssetResultCard(a) { navController.navigate(Screen.AssetDetail.go(a.id)) }
+                        }
+                    }
+                    if (rr.contacts.isNotEmpty()) {
+                        item { SectionHeader("Contacts", Icons.Outlined.Person) }
+                        items(rr.contacts) { c ->
+                            ContactResultCard(c) {
+                                c.clientId?.let { navController.navigate(Screen.ClientDetail.go(it)) }
+                            }
+                        }
+                    }
+                    if (rr.credentials.isNotEmpty()) {
+                        item { SectionHeader("Credentials", Icons.Outlined.Lock) }
+                        items(rr.credentials) { cr ->
+                            CredentialResultCard(cr) { navController.navigate(Screen.CredDetail.go(cr.id)) }
+                        }
+                    }
+                    if (rr.articles.isNotEmpty()) {
+                        item { SectionHeader("Knowledge Base", Icons.AutoMirrored.Outlined.MenuBook) }
+                        items(rr.articles) { kb ->
+                            KbArticleResultCard(kb) { navController.navigate(Screen.KbArticleDetail.go(kb.id)) }
                         }
                     }
                 }
@@ -205,6 +230,88 @@ private fun AssetResultCard(a: AssetSummary, onClick: () -> Unit) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Outlined.Devices, null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            },
+            trailingContent = { Icon(Icons.Outlined.ChevronRight, null) }
+        )
+    }
+}
+
+/** Contact result row — tapping opens the owning department, if known (search always sends it). */
+@Composable
+private fun ContactResultCard(c: Contact, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onClick) {
+        ListItem(
+            headlineContent = { Text(c.name, fontWeight = FontWeight.Medium) },
+            supportingContent = {
+                Text(listOfNotNull(c.title, c.client).joinToString(" · "))
+            },
+            leadingContent = {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Person, null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            },
+            trailingContent = { Icon(Icons.Outlined.ChevronRight, null) }
+        )
+    }
+}
+
+/** Credential result row — name/client only, never a secret value (search never returns one). */
+@Composable
+private fun CredentialResultCard(cr: CredentialSummary, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onClick) {
+        ListItem(
+            headlineContent = { Text(cr.name, fontWeight = FontWeight.Medium) },
+            supportingContent = { cr.client?.let { Text(it) } },
+            leadingContent = {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Lock, null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            },
+            trailingContent = { Icon(Icons.Outlined.ChevronRight, null) }
+        )
+    }
+}
+
+/** KB article result row. */
+@Composable
+private fun KbArticleResultCard(kb: KbArticleSearchResult, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onClick) {
+        ListItem(
+            headlineContent = { Text(kb.title, fontWeight = FontWeight.Medium) },
+            leadingContent = {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.MenuBook, null,
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onTertiaryContainer
                         )

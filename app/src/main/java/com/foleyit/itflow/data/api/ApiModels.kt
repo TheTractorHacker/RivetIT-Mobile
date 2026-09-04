@@ -102,7 +102,10 @@ data class ClientDetail(
 data class Contact(
     val id: Int, val name: String, val title: String?,
     val email: String?, val phone: String?, val extension: String?,
-    val client: String?
+    val client: String?,
+    // Only populated by search results (ApiService.search()) - other endpoints that return
+    // Contact already know their own client_id from context and don't send this field.
+    @SerializedName("client_id") val clientId: Int? = null,
 )
 
 // ── Assets ───────────────────────────────────────────────────────────────────
@@ -332,8 +335,15 @@ data class CreateTicketRequest(
 data class SearchResult(
     val tickets: List<TicketSummary>,
     val clients: List<ClientSummary>,
-    val assets: List<AssetSummary>
+    val assets: List<AssetSummary>,
+    // Server always includes these keys (empty array when the caller lacks that module's
+    // permission, or on an older backend without them - Gson defaults to empty either way).
+    val contacts: List<Contact> = emptyList(),
+    val credentials: List<CredentialSummary> = emptyList(),
+    val articles: List<KbArticleSearchResult> = emptyList(),
 )
+
+data class KbArticleSearchResult(val id: Int, val title: String)
 
 data class SearchTicket(
     val id: Int, val number: Int, val subject: String,
