@@ -9,7 +9,7 @@
 
     <!-- Cold-start splash — shown until installSplashScreen()'s keepOnScreenCondition clears. -->
     <style name="Theme.ITFlowMSP.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#0D6EFD</item>
+        <item name="windowSplashScreenBackground">#703396</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/Theme.ITFlowMSP</item>
     </style>

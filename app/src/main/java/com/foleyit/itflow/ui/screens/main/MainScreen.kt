@@ -164,7 +164,7 @@ fun MainScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             BrandMark(size = 28.dp)
                             Spacer(Modifier.width(10.dp))
-                            Text("ITFlow MSP", style = MaterialTheme.typography.titleLarge)
+                            Text("ITFlow Internal IT", style = MaterialTheme.typography.titleLarge)
                         }
                     },
                     actions = {

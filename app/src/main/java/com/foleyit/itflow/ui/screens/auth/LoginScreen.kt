@@ -86,7 +86,7 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
                 val resp = withContext(Dispatchers.IO) {
                     ApiClient.service().login(LoginRequest(
                         username = username.trim(), password = password,
-                        device_name = "ITFlow MSP Android",
+                        device_name = "ITFlow Internal IT Android",
                         totp_code = if (totpCode.isNotBlank()) totpCode.trim() else null
                     ))
                 }

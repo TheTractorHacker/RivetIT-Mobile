@@ -196,9 +196,9 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
             )
         }
         Spacer(Modifier.height(24.dp))
-        Text("Connect to ITFlow", style = MaterialTheme.typography.headlineMedium)
+        Text("Connect to ITFlow Internal IT", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
-        Text("Enter your ITFlow server address.",
+        Text("Enter your ITFlow Internal IT server address.",
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(40.dp))
 

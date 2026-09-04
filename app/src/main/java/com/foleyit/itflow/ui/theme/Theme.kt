@@ -35,7 +35,7 @@ enum class ColorSeed(val id: String) {
     VIOLET("violet");
 
     companion object {
-        val DEFAULT = FOLEYIT
+        val DEFAULT = VIOLET
         fun fromId(id: String?): ColorSeed = entries.find { it.id == id } ?: DEFAULT
     }
 }

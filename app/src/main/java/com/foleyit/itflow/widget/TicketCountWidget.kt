@@ -33,7 +33,7 @@ class TicketCountWidget : GlanceAppWidget() {
             ) {
                 Column(modifier = GlanceModifier.fillMaxSize()) {
                     Text(
-                        "ITFlow MSP",
+                        "ITFlow Internal IT",
                         style = TextStyle(
                             color = ColorProvider(Color(0xFF6650A4)),
                             fontWeight = FontWeight.Bold,

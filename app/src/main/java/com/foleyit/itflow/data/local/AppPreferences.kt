@@ -48,8 +48,8 @@ class AppPreferences(context: Context) {
     // "system" (follow device setting), "light", or "dark" — never Material You dynamic/
     // wallpaper-derived color, always one of the fixed brand seeds below.
     val themeMode: Flow<String>        = ctx.dataStore.data.map { it[THEME_MODE] ?: "system" }
-    // One of ColorSeed's ids ("foleyit"/"teal"/"sunset"/"forest"/"violet"); "foleyit" is default.
-    val colorSeed: Flow<String>        = ctx.dataStore.data.map { it[COLOR_SEED] ?: "foleyit" }
+    // One of ColorSeed's ids ("foleyit"/"teal"/"sunset"/"forest"/"violet"); "violet" is default.
+    val colorSeed: Flow<String>        = ctx.dataStore.data.map { it[COLOR_SEED] ?: "violet" }
 
     val authToken: Flow<String?> = flow {
         emit(securePrefs.getString("auth_token", null))

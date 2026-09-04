@@ -591,7 +591,7 @@ fun ProfileScreen(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    "ITFlow MSP ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    "ITFlow Internal IT ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
