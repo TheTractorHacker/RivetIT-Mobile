@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ITFlowMSP" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Cold-start splash — shown until installSplashScreen()'s keepOnScreenCondition clears. -->
+    <style name="Theme.ITFlowMSP.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0D6EFD</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.ITFlowMSP</item>
+    </style>
+</resources>

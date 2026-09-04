@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- New brand mark: bold white "F" monogram (3 rounded strokes) + a FoleyIT-green accent
+         dot, replacing the old sync_alt/cycle-arrows glyph. Scaled/centered from the 24x24
+         reference SVG (factor 2.5, offset 24,24) into the 108x108 adaptive-icon canvas. The dot
+         uses a fixed hex (this vector can't react to the in-app color-seed/dark-mode theme the
+         way the Compose FoleyItLogoMark composable does) — FoleyIT's own light-mode secondary
+         (#009966), the same brand green used as the app's default in-app accent. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,36.5 A3.75,3.75 0 0 1 48,40.25 L48,67.75 A3.75,3.75 0 0 1 44,71.5 A3.75,3.75 0 0 1 40.25,67.75 L40.25,40.25 A3.75,3.75 0 0 1 44,36.5 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,36.5 L62.75,36.5 A3.75,3.75 0 0 1 66.5,40.25 A3.75,3.75 0 0 1 62.75,44 L44,44 A3.75,3.75 0 0 1 40.25,40.25 A3.75,3.75 0 0 1 44,36.5 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,50.25 L56.5,50.25 A3.75,3.75 0 0 1 60.25,54 A3.75,3.75 0 0 1 56.5,57.75 L44,57.75 A3.75,3.75 0 0 1 40.25,54 A3.75,3.75 0 0 1 44,50.25 Z"/>
+    <path
+        android:fillColor="#009966"
+        android:pathData="M63.25,70.25 A7,7 0 1 0 77.25,70.25 A7,7 0 1 0 63.25,70.25 Z"/>
+</vector>

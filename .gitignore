@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+# google-services.json contains only public client config (no private keys), safe to track
+# app/google-services.json
+*.keystore
+*.jks
+# Debug signing key is checked in deliberately: it's the standard well-known-password Android
+# debug keystore, never used for the production release identity, and must be stable (not
+# freshly regenerated per machine/CI run) so Digital Asset Links / passkey origin checks against
+# the beta app's fixed fingerprint keep working.
+!app/debug.keystore
+*.hprof
