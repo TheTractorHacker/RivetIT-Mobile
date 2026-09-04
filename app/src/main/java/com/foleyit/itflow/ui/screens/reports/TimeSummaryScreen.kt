@@ -90,7 +90,7 @@ fun TimeSummaryScreen(navController: NavController) {
                             }
                         } else {
                             item {
-                                Text("By Client",
+                                Text("By Department",
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 4.dp))

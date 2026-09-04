@@ -118,7 +118,7 @@ fun CsatReportScreen(navController: NavController) {
                                 }
                             }
                             if (report.byClient.isNotEmpty()) {
-                                item { Spacer(Modifier.height(8.dp)); Text("By Client", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                item { Spacer(Modifier.height(8.dp)); Text("By Department", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 items(report.byClient) { c ->
                                     ReportBarRow(
                                         label = c.name,

@@ -25,9 +25,9 @@ private data class ReportEntry(
 )
 
 private val TICKET_REPORTS = listOf(
-    ReportEntry("Time Summary", "Hours logged by client", Icons.Outlined.Timer, Screen.TimeReport.route),
+    ReportEntry("Time Summary", "Hours logged by department", Icons.Outlined.Timer, Screen.TimeReport.route),
     ReportEntry("Ticket Volume", "Tickets raised per month", Icons.AutoMirrored.Outlined.TrendingUp, Screen.TicketVolumeReport.route),
-    ReportEntry("Tickets by Client", "Raised, resolved, priority breakdown", Icons.Outlined.Business, Screen.TicketsByClientReport.route),
+    ReportEntry("Tickets by Department", "Raised, resolved, priority breakdown", Icons.Outlined.Business, Screen.TicketsByClientReport.route),
     ReportEntry("Time by Technician", "Tickets assigned/touched, time worked", Icons.Outlined.Person, Screen.TimeByTechReport.route),
     ReportEntry("Technician Performance", "Open workload vs. resolved this year", Icons.Outlined.EmojiEvents, Screen.TechPerformanceReport.route),
     ReportEntry("Overview", "Open tickets by priority, status, category", Icons.Outlined.PieChart, Screen.OverviewReport.route),
@@ -38,7 +38,7 @@ private val FINANCIAL_REPORTS = listOf(
     ReportEntry("Expense Summary", "Monthly expenses by category", Icons.Outlined.Receipt, Screen.ExpenseSummaryReport.route),
     ReportEntry("Profit & Loss", "Income minus expenses by month", Icons.Outlined.Balance, Screen.ProfitLossReport.route),
     ReportEntry("Unbilled Tickets", "Billable tickets not yet invoiced", Icons.Outlined.RequestQuote, Screen.UnbilledTicketsReport.route),
-    ReportEntry("Clients with a Balance", "Outstanding invoice balances", Icons.Outlined.AccountBalanceWallet, Screen.ClientsWithBalanceReport.route),
+    ReportEntry("Departments with a Balance", "Outstanding invoice balances", Icons.Outlined.AccountBalanceWallet, Screen.ClientsWithBalanceReport.route),
 )
 
 private val OPERATIONS_REPORTS = listOf(

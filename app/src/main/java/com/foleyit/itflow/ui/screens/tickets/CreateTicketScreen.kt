@@ -78,12 +78,12 @@ fun CreateTicketScreen(navController: NavController) {
     if (showClientPicker) {
         ModalBottomSheet(onDismissRequest = { showClientPicker = false }) {
             Column(Modifier.padding(16.dp).navigationBarsPadding()) {
-                Text("Select Client", style = MaterialTheme.typography.titleMedium,
+                Text("Select Department", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
                 Surface(onClick = { selectedClientId = null; selectedClientName = ""; showClientPicker = false },
                     modifier = Modifier.fillMaxWidth()) {
-                    Text("— No Client —", Modifier.padding(16.dp),
+                    Text("— No Department —", Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.outline)
                 }
                 HorizontalDivider()
@@ -224,7 +224,7 @@ fun CreateTicketScreen(navController: NavController) {
             Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionLabel("Client")
+                        SectionLabel("Department")
                         Surface(
                             onClick = { showClientPicker = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -238,7 +238,7 @@ fun CreateTicketScreen(navController: NavController) {
                                 Icon(Icons.Outlined.Business, null, tint = MaterialTheme.colorScheme.outline)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
-                                    selectedClientName.ifBlank { "Select client (optional)" },
+                                    selectedClientName.ifBlank { "Select department (optional)" },
                                     color = if (selectedClientName.isBlank()) MaterialTheme.colorScheme.outline
                                             else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)

@@ -134,7 +134,7 @@ fun RmmHealthReportScreen(navController: NavController) {
                             }
 
                             if (report.noisiestClients.isNotEmpty()) {
-                                item { Spacer(Modifier.height(8.dp)); Text("Noisiest Clients", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                item { Spacer(Modifier.height(8.dp)); Text("Noisiest Departments", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 items(report.noisiestClients, key = { it.clientId }) { c ->
                                     ReportBarRow(
                                         label = c.clientName,

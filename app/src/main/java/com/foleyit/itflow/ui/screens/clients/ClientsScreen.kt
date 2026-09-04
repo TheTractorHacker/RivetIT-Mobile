@@ -30,7 +30,7 @@ fun ClientsScreen(navController: NavController) {
             value = search,
             onValueChange = { search = it; list.onSearchChanged(it) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Search clients…") },
+            placeholder = { Text("Search departments…") },
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             trailingIcon = {
                 if (search.isNotEmpty()) IconButton(onClick = { search = ""; list.onSearchChanged("") }) { Icon(Icons.Outlined.Clear, "Clear search") }
@@ -42,7 +42,7 @@ fun ClientsScreen(navController: NavController) {
         when {
             ls.isRefreshing -> LoadingScreen()
             ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
-            ls.items.isEmpty() -> EmptyScreen("No clients found", Icons.Outlined.Business)
+            ls.items.isEmpty() -> EmptyScreen("No departments found", Icons.Outlined.Business)
             else -> {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ls.items, key = { it.id }) { c ->

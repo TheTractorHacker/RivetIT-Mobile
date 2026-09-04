@@ -875,7 +875,7 @@ private fun WorksheetsCard(
                 verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("Outtake Forms", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text("Client signs on pickup", style = MaterialTheme.typography.bodySmall,
+                    Text("Department signs on pickup", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline)
                 }
                 onAddOuttake?.let { action ->
@@ -1202,7 +1202,7 @@ private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: () -> Unit) {
                 fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Creates a sign-off form so the client can sign when picking up their device.",
+                "Creates a sign-off form so the department can sign when picking up their device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()

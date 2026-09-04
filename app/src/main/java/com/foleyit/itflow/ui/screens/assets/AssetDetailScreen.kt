@@ -99,7 +99,7 @@ fun AssetDetailScreen(id: Int, navController: NavController) {
                                 Text("Details", style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(8.dp))
-                                AssetRow("Client", a.client)
+                                AssetRow("Department", a.client)
                                 AssetRow("Make", a.make)
                                 AssetRow("Model", a.model)
                                 AssetRow("OS", a.os)

@@ -45,7 +45,7 @@ fun ClientDetailScreen(id: Int, navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { clientState?.getOrNull()?.let { Text(it.name) } ?: Text("Client") },
+                title = { clientState?.getOrNull()?.let { Text(it.name) } ?: Text("Department") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back")
@@ -368,7 +368,7 @@ private fun ClientCredentialsTab(clientId: Int, navController: NavController) {
                         })
                     prompt.authenticate(androidx.biometric.BiometricPrompt.PromptInfo.Builder()
                         .setTitle("Verify identity")
-                        .setSubtitle("Access client credentials")
+                        .setSubtitle("Access department credentials")
                         .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
                         .setNegativeButtonText("Cancel")
                         .build(),

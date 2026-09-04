@@ -33,7 +33,7 @@ fun TicketsByClientReportScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tickets by Client") },
+                title = { Text("Tickets by Department") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
                 }

@@ -110,7 +110,7 @@ fun SearchScreen(navController: NavController) {
                         }
                     }
                     if (rr.clients.isNotEmpty()) {
-                        item { SectionHeader("Clients", Icons.Outlined.Business) }
+                        item { SectionHeader("Departments", Icons.Outlined.Business) }
                         items(rr.clients) { c ->
                             ClientResultCard(c) { navController.navigate(Screen.ClientDetail.go(c.id)) }
                         }

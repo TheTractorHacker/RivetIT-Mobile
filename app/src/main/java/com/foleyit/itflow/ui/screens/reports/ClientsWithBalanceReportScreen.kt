@@ -33,7 +33,7 @@ fun ClientsWithBalanceReportScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Clients with a Balance") },
+                title = { Text("Departments with a Balance") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
                 }
