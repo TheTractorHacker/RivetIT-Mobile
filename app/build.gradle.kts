@@ -10,11 +10,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.foleyit.itflow"
+        applicationId = "com.foleyit.itflow.internal"
         minSdk = 34
         targetSdk = 36
-        versionCode = 36
-        versionName = "1.28.0"
+        versionCode = 1
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

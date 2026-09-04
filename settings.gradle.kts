@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "ITFlow MSP"
+rootProject.name = "ITFlow Internal IT"
 include(":app")

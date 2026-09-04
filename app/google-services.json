@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "694461584189",
-    "project_id": "it-flow-msp",
-    "storage_bucket": "it-flow-msp.firebasestorage.app"
+    "project_number": "000000000000",
+    "project_id": "itflow-internal-it-placeholder",
+    "storage_bucket": "itflow-internal-it-placeholder.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:694461584189:android:7d5649ff45a7c8ba086b54",
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
         "android_client_info": {
-          "package_name": "com.foleyit.itflow"
+          "package_name": "com.foleyit.itflow.internal"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDBRgnk9hDoMNvxsj-kz9HWuev3etMqQPg"
+          "current_key": "AIzaSyPLACEHOLDER00000000000000000000"
         }
       ],
       "services": {
@@ -26,15 +26,15 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:694461584189:android:6dd4fb6c66719d1a086b54",
+        "mobilesdk_app_id": "1:000000000000:android:1111111111111111111111",
         "android_client_info": {
-          "package_name": "com.foleyit.itflow.beta"
+          "package_name": "com.foleyit.itflow.internal.beta"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDBRgnk9hDoMNvxsj-kz9HWuev3etMqQPg"
+          "current_key": "AIzaSyPLACEHOLDER00000000000000000000"
         }
       ],
       "services": {
