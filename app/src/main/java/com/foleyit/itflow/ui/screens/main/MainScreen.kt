@@ -31,6 +31,7 @@ import com.foleyit.itflow.ui.screens.worksheets.FillWorksheetScreen
 import com.foleyit.itflow.ui.screens.worksheets.OuttakeSignScreen
 import com.foleyit.itflow.ui.screens.profile.ProfileScreen
 import com.foleyit.itflow.ui.screens.assets.*
+import com.foleyit.itflow.ui.screens.projects.*
 import com.foleyit.itflow.ui.screens.clients.*
 import com.foleyit.itflow.ui.screens.credentials.*
 import com.foleyit.itflow.ui.screens.dashboard.DashboardScreen
@@ -53,7 +54,7 @@ import kotlinx.coroutines.withContext
 // Routes that show the main ITFlow MSP AppBar
 private val ROOT_ROUTES = setOf(
     Screen.Dashboard.route, Screen.Tickets.route, Screen.Clients.route,
-    Screen.Assets.route, Screen.Appointments.route,
+    Screen.Assets.route, Screen.Projects.route, Screen.Appointments.route,
     Screen.Credentials.route, Screen.Quotes.route,
     Screen.Invoices.route, Screen.Expenses.route,
     Screen.Notifications.route, Screen.Alerts.route
@@ -242,6 +243,10 @@ fun MainScreen(
             composable(Screen.Assets.route) { AssetsScreen(navController) }
             composable(Screen.AssetDetail.route) {
                 AssetDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
+            }
+            composable(Screen.Projects.route) { ProjectsScreen(navController) }
+            composable(Screen.ProjectDetail.route) {
+                ProjectDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
             composable(Screen.Appointments.route) { AppointmentsScreen(navController) }
             composable(Screen.Credentials.route) { CredentialsScreen(navController) }

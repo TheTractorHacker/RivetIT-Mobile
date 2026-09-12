@@ -21,6 +21,8 @@ sealed class Screen(val route: String) {
     object ClientDetail  : Screen("clients/{id}")    { fun go(id: Int) = "clients/$id" }
     object Assets        : Screen("assets")
     object AssetDetail   : Screen("assets/{id}")     { fun go(id: Int) = "assets/$id" }
+    object Projects      : Screen("projects")
+    object ProjectDetail : Screen("projects/{id}")   { fun go(id: Int) = "projects/$id" }
     object Credentials   : Screen("credentials")
     object CredDetail    : Screen("credentials/{id}"){ fun go(id: Int) = "credentials/$id" }
     object Quotes        : Screen("quotes")

@@ -207,6 +207,10 @@ fun AppDrawerContent(
             HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 12.dp))
 
             NavigationDrawerItem(
+                label = { Text("Projects") }, icon = { DrawerLeadingIcon(Icons.Outlined.AccountTree) },
+                selected = false, onClick = { onNavigate(Screen.Projects.route) }, modifier = DrawerItemPadding,
+            )
+            NavigationDrawerItem(
                 label = { Text("Reports") }, icon = { DrawerLeadingIcon(Icons.Outlined.Assessment) },
                 selected = false, onClick = { onNavigate(Screen.ReportsHub.route) }, modifier = DrawerItemPadding,
             )
