@@ -39,9 +39,45 @@ private fun parseHexColor(hex: String?): Color? = try {
 fun ProjectDetailScreen(id: Int, navController: NavController) {
     var state by remember { mutableStateOf<Result<ProjectDetail>?>(null) }
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    var pending by remember { mutableStateOf(setOf<String>()) }
 
     fun load() { scope.launch { state = runCatching { ApiClient.service().getProject(id) } } }
     LaunchedEffect(Unit) { load() }
+
+    fun toggleTask(taskId: Int) {
+        val key = "t$taskId"
+        if (key in pending) return
+        pending = pending + key
+        scope.launch {
+            val result = runCatching { ApiClient.service().toggleTask(taskId) }
+            result.onSuccess { updated ->
+                state?.getOrNull()?.let { p ->
+                    state = Result.success(p.copy(tasks = p.tasks.map { if (it.id == updated.id) updated else it }))
+                }
+            }.onFailure {
+                snackbar.showSnackbar("Couldn't update task")
+            }
+            pending = pending - key
+        }
+    }
+
+    fun toggleMilestone(milestoneId: Int) {
+        val key = "m$milestoneId"
+        if (key in pending) return
+        pending = pending + key
+        scope.launch {
+            val result = runCatching { ApiClient.service().toggleMilestone(milestoneId) }
+            result.onSuccess { updated ->
+                state?.getOrNull()?.let { p ->
+                    state = Result.success(p.copy(milestones = p.milestones.map { if (it.id == updated.id) updated else it }))
+                }
+            }.onFailure {
+                snackbar.showSnackbar("Couldn't update milestone")
+            }
+            pending = pending - key
+        }
+    }
 
     val project = state?.getOrNull()
 
@@ -57,7 +93,8 @@ fun ProjectDetailScreen(id: Int, navController: NavController) {
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
         when {
             state == null -> LoadingScreen()
@@ -147,16 +184,20 @@ fun ProjectDetailScreen(id: Int, navController: NavController) {
                         }
                     }
 
-                    // Milestones
+                    // Milestones — tap to toggle complete
                     if (p.milestones.isNotEmpty()) {
                         item { SectionLabel("Milestones") }
-                        items(p.milestones, key = { "m${it.id}" }) { m -> MilestoneRow(m) }
+                        items(p.milestones, key = { "m${it.id}" }) { m ->
+                            MilestoneRow(m, pending = "m${m.id}" in pending, onToggle = { toggleMilestone(m.id) })
+                        }
                     }
 
-                    // Tasks
+                    // Tasks — tap to toggle complete
                     if (p.tasks.isNotEmpty()) {
                         item { SectionLabel("Tasks") }
-                        items(p.tasks, key = { "t${it.id}" }) { t -> TaskRow(t) }
+                        items(p.tasks, key = { "t${it.id}" }) { t ->
+                            TaskRow(t, pending = "t${t.id}" in pending, onToggle = { toggleTask(t.id) })
+                        }
                     }
 
                     // Linked tickets
@@ -201,17 +242,24 @@ private fun ProgressBarRow(label: String, done: Int, total: Int) {
 }
 
 @Composable
-private fun MilestoneRow(m: ProjectMilestone) {
+private fun CompletionIcon(completed: Boolean, pending: Boolean) {
+    if (pending) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+    } else {
+        Icon(
+            if (completed) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+            null,
+            tint = if (completed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
+        )
+    }
+}
+
+@Composable
+private fun MilestoneRow(m: ProjectMilestone, pending: Boolean, onToggle: () -> Unit) {
     val completed = m.status == "completed" || m.completedAt != null
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onToggle, enabled = !pending) {
         ListItem(
-            leadingContent = {
-                Icon(
-                    if (completed) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                    null,
-                    tint = if (completed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
-                )
-            },
+            leadingContent = { CompletionIcon(completed, pending) },
             headlineContent = {
                 Text(m.name, textDecoration = if (completed) TextDecoration.LineThrough else null)
             },
@@ -223,17 +271,11 @@ private fun MilestoneRow(m: ProjectMilestone) {
 }
 
 @Composable
-private fun TaskRow(t: ProjectTask) {
+private fun TaskRow(t: ProjectTask, pending: Boolean, onToggle: () -> Unit) {
     val completed = t.completedAt != null
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onToggle, enabled = !pending) {
         ListItem(
-            leadingContent = {
-                Icon(
-                    if (completed) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                    null,
-                    tint = if (completed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
-                )
-            },
+            leadingContent = { CompletionIcon(completed, pending) },
             headlineContent = {
                 Text(t.name, textDecoration = if (completed) TextDecoration.LineThrough else null)
             },

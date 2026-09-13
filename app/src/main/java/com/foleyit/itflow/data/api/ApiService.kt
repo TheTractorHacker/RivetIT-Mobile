@@ -225,6 +225,12 @@ interface ApiService {
     @GET("projects/{id}")
     suspend fun getProject(@Path("id") id: Int): ProjectDetail
 
+    @POST("tasks/{id}/toggle")
+    suspend fun toggleTask(@Path("id") id: Int): ProjectTask
+
+    @POST("milestones/{id}/toggle")
+    suspend fun toggleMilestone(@Path("id") id: Int): ProjectMilestone
+
     // Contracts
     @GET("contracts")
     suspend fun getContracts(
