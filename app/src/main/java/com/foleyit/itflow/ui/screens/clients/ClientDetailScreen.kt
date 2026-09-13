@@ -121,7 +121,7 @@ fun ClientDetailScreen(id: Int, navController: NavController) {
                         3 -> ClientAssetsTab(id, navController)
                         4 -> ClientLocationsTab(id, context)
                         5 -> ClientCredentialsTab(id, navController)
-                        6 -> ClientContractsTab(id)
+                        6 -> ClientContractsTab(id, navController)
                         7 -> ClientFilesTab(id, navController)
                     }
                 }
@@ -407,7 +407,7 @@ private fun ClientCredentialsTab(clientId: Int, navController: NavController) {
 }
 
 @Composable
-private fun ClientContractsTab(clientId: Int) {
+private fun ClientContractsTab(clientId: Int, navController: NavController) {
     var state by remember { mutableStateOf<Result<List<ClientContract>>?>(null) }
     val scope = rememberCoroutineScope()
     fun load() { scope.launch { state = runCatching { ApiClient.service().getClientContracts(clientId) } } }
@@ -420,12 +420,16 @@ private fun ClientContractsTab(clientId: Int) {
             if (contracts.isEmpty()) { EmptyScreen("No contracts", Icons.Outlined.Description); return }
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(contracts) { c ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+                        onClick = { navController.navigate(Screen.ContractDetail.go(c.id)) }
+                    ) {
                         ListItem(
                             headlineContent = { Text(c.name ?: "", fontWeight = FontWeight.Medium) },
                             supportingContent = { Text("${c.type ?: ""} · ${c.status ?: ""}") },
                             leadingContent = { Icon(Icons.Outlined.Description, null,
-                                tint = MaterialTheme.colorScheme.primary) }
+                                tint = MaterialTheme.colorScheme.primary) },
+                            trailingContent = { Icon(Icons.Outlined.ChevronRight, null) }
                         )
                     }
                 }

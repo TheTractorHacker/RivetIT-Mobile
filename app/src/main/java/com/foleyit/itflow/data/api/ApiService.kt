@@ -225,6 +225,20 @@ interface ApiService {
     @GET("projects/{id}")
     suspend fun getProject(@Path("id") id: Int): ProjectDetail
 
+    // Contracts
+    @GET("contracts")
+    suspend fun getContracts(
+        @Query("search") search: String = "",
+        @Query("page") page: Int = 1,
+        @Query("status") status: String = "",
+        @Query("client_id") clientId: Int? = null,
+        @Query("expiring") expiring: Int = 0
+    ): ContractsResponse
+
+    @Headers("Cache-Control: no-store")
+    @GET("contracts/{id}")
+    suspend fun getContract(@Path("id") id: Int): ContractDetail
+
     // Credentials — never cache: responses contain decrypted passwords
     @Headers("Cache-Control: no-store")
     @GET("credentials")

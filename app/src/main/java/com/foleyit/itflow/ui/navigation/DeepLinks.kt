@@ -7,6 +7,6 @@ package com.foleyit.itflow.ui.navigation
  */
 object DeepLinks {
     val ALLOWED_ROUTE = Regex(
-        """^(tickets|clients|assets|projects|credentials|quotes|invoices|expenses|notifications|appointments|worksheets|outtakes|search|reports|scan|profile|kb|alerts)(/\d+(/\w+)?)?$"""
+        """^(tickets|clients|assets|projects|contracts|credentials|quotes|invoices|expenses|notifications|appointments|worksheets|outtakes|search|reports|scan|profile|kb|alerts)(/\d+(/\w+)?)?$"""
     )
 }

@@ -222,6 +222,10 @@ fun AppDrawerContent(
                 label = { Text("Credentials") }, icon = { DrawerLeadingIcon(Icons.Outlined.Lock) },
                 selected = false, onClick = { onNavigate(Screen.Credentials.route) }, modifier = DrawerItemPadding,
             )
+            NavigationDrawerItem(
+                label = { Text("Contracts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Description) },
+                selected = false, onClick = { onNavigate(Screen.Contracts.route) }, modifier = DrawerItemPadding,
+            )
             // Hidden entirely when the server has both billing modules disabled (matches
             // agent/includes/side_nav.php's config_module_enable_accounting ||
             // config_module_enable_ticket_charges convention) - defaults hidden (fail-closed)
