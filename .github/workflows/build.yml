@@ -2,10 +2,10 @@ name: Build APK
 
 on:
   push:
-    branches: [beta]
+    branches: [main]
     tags: ['v*']
   pull_request:
-    branches: [beta]
+    branches: [main]
 
 permissions:
   contents: write
@@ -81,12 +81,12 @@ jobs:
         run: echo "name=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)" >> "$GITHUB_OUTPUT"
 
       - name: Rename debug APK
-        run: mv app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/itflow-internal-it-${{ steps.version.outputs.name }}-debug.apk"
+        run: mv app/build/outputs/apk/debug/*.apk "app/build/outputs/apk/debug/rivetit-mobile-${{ steps.version.outputs.name }}-debug.apk"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: itflow-internal-it-${{ steps.version.outputs.name }}-debug
+          name: rivetit-mobile-${{ steps.version.outputs.name }}-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
@@ -146,7 +146,7 @@ jobs:
         run: echo "name=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)" >> "$GITHUB_OUTPUT"
 
       - name: Rename release APK
-        run: mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/itflow-internal-it-${{ steps.version.outputs.name }}-release.apk"
+        run: mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/rivetit-mobile-${{ steps.version.outputs.name }}-release.apk"
 
       - name: Attach release APK to GitHub Release
         uses: softprops/action-gh-release@v2

@@ -1,9 +1,12 @@
 package com.foleyit.itflow.ui.util
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -125,5 +128,56 @@ class PagedListStateTest {
 
         assertNull(controller.state.error)
         assertEquals(1, controller.state.items.size)
+    }
+
+    @Test
+    fun `restored search query is used for initial and filtered loads`() = runTest {
+        val queries = mutableListOf<String>()
+        val controller = PagedListController<FakeItem>(scope = this, initialQuery = "printer") { _, query ->
+            queries += query
+            FakePage(listOf(FakeItem(1)), 1)
+        }
+
+        controller.refresh()
+        advanceUntilIdle()
+        controller.retry()
+        advanceUntilIdle()
+
+        assertEquals(listOf("printer", "printer"), queries)
+    }
+
+    @Test
+    fun `failed refresh retains prior results for retry`() = runTest {
+        var fail = false
+        val controller = PagedListController<FakeItem>(scope = this) { _, _ ->
+            if (fail) throw IllegalStateException("network unavailable")
+            FakePage(listOf(FakeItem(7)), 1)
+        }
+
+        controller.refresh()
+        advanceUntilIdle()
+        fail = true
+        controller.refresh()
+        advanceUntilIdle()
+
+        assertEquals(listOf(7), controller.state.items.map { it.id })
+        assertTrue(controller.state.error is IllegalStateException)
+        assertFalse(controller.state.isRefreshing)
+    }
+
+    @Test
+    fun `late response from old search cannot replace new results`() = runTest {
+        val controller = PagedListController<FakeItem>(scope = this, debounceMs = 0) { _, query ->
+            if (query == "old") withContext(NonCancellable) { delay(100) }
+            FakePage(listOf(FakeItem(if (query == "new") 2 else 1)), 1)
+        }
+
+        controller.onSearchChanged("old")
+        advanceTimeBy(1)
+        controller.onSearchChanged("new")
+        advanceUntilIdle()
+
+        assertEquals(listOf(2), controller.state.items.map { it.id })
+        assertFalse(controller.state.isRefreshing)
     }
 }

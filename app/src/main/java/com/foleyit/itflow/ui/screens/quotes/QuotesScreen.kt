@@ -34,11 +34,14 @@ fun QuotesScreen(navController: NavController) {
     Scaffold(topBar = { TopAppBar(title = { Text("Quotes") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } }) }) { padding ->
         val ls = list.state
         when {
-            ls.isRefreshing -> LoadingScreen()
-            ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+            ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+            ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
             ls.items.isEmpty() -> EmptyScreen("No quotes", Icons.Outlined.RequestQuote)
             else -> {
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (ls.isRefreshing || ls.error != null) {
+                        item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                    }
                     items(ls.items, key = { it.id }) { q ->
                         val statusColor = MaterialTheme.statusColors.forFinancialStatus(q.status)
                         Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = { navController.navigate(Screen.QuoteDetail.go(q.id)) }) {

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,6 +21,7 @@ import com.foleyit.itflow.ui.components.EmptyScreen
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadMoreRow
 import com.foleyit.itflow.ui.components.LoadingScreen
+import com.foleyit.itflow.ui.components.PagedListStatus
 import com.foleyit.itflow.ui.components.pressScale
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.rememberPagedList
@@ -52,7 +54,7 @@ private fun assetTypeIcon(rawType: String?) = when (rawType?.trim()?.lowercase()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetsScreen(navController: NavController) {
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var types by remember { mutableStateOf<List<String>>(emptyList()) }
 
@@ -70,7 +72,7 @@ fun AssetsScreen(navController: NavController) {
     // The server's `type` filter only accepts a single raw type string, but a category can span
     // several of them — so fetch unfiltered (by search only) and filter client-side by category
     // for display. This never drops matching assets; loading more pages surfaces more of them.
-    val list = rememberPagedList<com.foleyit.itflow.data.api.AssetSummary>(Unit) { page, q ->
+    val list = rememberPagedList<com.foleyit.itflow.data.api.AssetSummary>(Unit, initialQuery = search) { page, q ->
         ApiClient.service().getAssets(search = q, page = page, type = "")
     }
 
@@ -130,8 +132,8 @@ fun AssetsScreen(navController: NavController) {
                     ?: ls.items
             }
             when {
-                ls.isRefreshing -> LoadingScreen()
-                ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+                ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+                ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
                 // Only treat this as a true dead end once every page has been fetched — a
                 // category filter can legitimately have zero matches on the pages loaded so far
                 // while more still exist further in the (unfiltered) paginated list; falling
@@ -143,6 +145,9 @@ fun AssetsScreen(navController: NavController) {
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (ls.isRefreshing || ls.error != null) {
+                            item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                        }
                         items(displayedItems, key = { it.id }) { a ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),

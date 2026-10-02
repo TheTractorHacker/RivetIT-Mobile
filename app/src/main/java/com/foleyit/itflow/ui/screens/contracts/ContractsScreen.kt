@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -20,6 +21,7 @@ import com.foleyit.itflow.ui.components.EmptyScreen
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadMoreRow
 import com.foleyit.itflow.ui.components.LoadingScreen
+import com.foleyit.itflow.ui.components.PagedListStatus
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.fmtDate
 import com.foleyit.itflow.ui.util.rememberPagedList
@@ -28,10 +30,10 @@ import com.foleyit.itflow.ui.util.userMessage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContractsScreen(navController: NavController) {
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     var expiringOnly by remember { mutableStateOf(false) }
 
-    val list = rememberPagedList<ContractSummary>(expiringOnly) { page, q ->
+    val list = rememberPagedList<ContractSummary>(expiringOnly, initialQuery = search) { page, q ->
         ApiClient.service().getContracts(search = q, page = page, expiring = if (expiringOnly) 1 else 0)
     }
 
@@ -73,14 +75,17 @@ fun ContractsScreen(navController: NavController) {
 
             val ls = list.state
             when {
-                ls.isRefreshing -> LoadingScreen()
-                ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+                ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+                ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
                 ls.items.isEmpty() -> EmptyScreen("No contracts found", Icons.Outlined.Description)
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (ls.isRefreshing || ls.error != null) {
+                            item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                        }
                         items(ls.items, key = { it.id }) { c ->
                             ContractCard(c) { navController.navigate(Screen.ContractDetail.go(c.id)) }
                         }

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,7 +29,7 @@ import com.foleyit.itflow.ui.util.userMessage
 @Composable
 fun CredentialsScreen(navController: NavController) {
     var authenticated by remember { mutableStateOf(false) }
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val localActivity = androidx.activity.compose.LocalActivity.current
 
@@ -67,7 +68,7 @@ fun CredentialsScreen(navController: NavController) {
         return
     }
 
-    val list = rememberPagedList<com.foleyit.itflow.data.api.CredentialSummary> { page, q ->
+    val list = rememberPagedList<com.foleyit.itflow.data.api.CredentialSummary>(initialQuery = search) { page, q ->
         ApiClient.service().getCredentials(search = q, page = page)
     }
 
@@ -87,11 +88,14 @@ fun CredentialsScreen(navController: NavController) {
             )
             val ls = list.state
             when {
-                ls.isRefreshing -> LoadingScreen()
-                ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+                ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+                ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
                 ls.items.isEmpty() -> EmptyScreen("No credentials found", Icons.Outlined.Lock)
                 else -> {
                     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (ls.isRefreshing || ls.error != null) {
+                            item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                        }
                         items(ls.items, key = { it.id }) { c ->
                             Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = { navController.navigate(Screen.CredDetail.go(c.id)) }) {
                                 ListItem(

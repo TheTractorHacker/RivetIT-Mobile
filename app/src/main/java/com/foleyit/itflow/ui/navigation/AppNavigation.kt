@@ -67,13 +67,14 @@ data class BottomNavItem(
     val screen: Screen,
     val label: String,
     val icon: ImageVector,
-    val selectedIcon: ImageVector
+    val selectedIcon: ImageVector,
+    val accessibilityLabel: String = label
 )
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Dashboard,    "Home",    Icons.Outlined.Dashboard,           Icons.Filled.Dashboard),
     BottomNavItem(Screen.Tickets,      "Tickets", Icons.Outlined.ConfirmationNumber,  Icons.Filled.ConfirmationNumber),
-    BottomNavItem(Screen.Clients,      "Departments", Icons.Outlined.Business,            Icons.Filled.Business),
+    BottomNavItem(Screen.Clients,      "Depts", Icons.Outlined.Business,            Icons.Filled.Business, "Departments"),
     BottomNavItem(Screen.Assets,       "Assets",  Icons.Outlined.Devices,             Icons.Filled.Devices),
     BottomNavItem(Screen.Appointments, "Appts",   Icons.Outlined.CalendarMonth,       Icons.Filled.CalendarMonth),
 )

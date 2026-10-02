@@ -30,7 +30,7 @@ import com.foleyit.itflow.data.local.AppPreferences
 import com.foleyit.itflow.data.ssl.FingerprintTrustManager
 import com.foleyit.itflow.data.ssl.probeCertificate
 import com.foleyit.itflow.data.ssl.sha256Fingerprint
-import com.foleyit.itflow.ui.components.FoleyItLogoMark
+import com.foleyit.itflow.ui.components.RivetItLogoMark
 import com.foleyit.itflow.ui.util.userMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -190,15 +190,15 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 .background(logoTileGradient, MaterialTheme.shapes.extraLarge),
             contentAlignment = Alignment.Center
         ) {
-            FoleyItLogoMark(
+            RivetItLogoMark(
                 modifier = Modifier.size(40.dp),
                 markColor = MaterialTheme.colorScheme.onPrimary,
             )
         }
         Spacer(Modifier.height(24.dp))
-        Text("Connect to ITFlow Internal IT", style = MaterialTheme.typography.headlineMedium)
+        Text("Connect to RivetIT", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
-        Text("Enter your ITFlow Internal IT server address.",
+        Text("Enter your RivetIT server address.",
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(40.dp))
 

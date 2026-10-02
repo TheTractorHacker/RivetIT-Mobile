@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,28 +35,52 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTicketScreen(navController: NavController) {
-    var subject by remember { mutableStateOf("") }
-    var details by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf("low") }
-    var selectedClientId by remember { mutableStateOf<Int?>(null) }
-    var selectedClientName by remember { mutableStateOf("") }
+    var subject by rememberSaveable { mutableStateOf("") }
+    var details by rememberSaveable { mutableStateOf("") }
+    var priority by rememberSaveable { mutableStateOf("low") }
+    var selectedClientId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedClientName by rememberSaveable { mutableStateOf("") }
     var clients by remember { mutableStateOf<ClientsResponse?>(null) }
     var showClientPicker by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<List<TicketCategory>>(emptyList()) }
-    var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val hasDraft = subject.isNotBlank() || details.isNotBlank() || priority != "low" ||
+        selectedClientId != null || selectedCategoryId != null
+
+    fun goBack() {
+        if (saving) return
+        if (hasDraft) showDiscardConfirm = true else navController.popBackStack()
+    }
+    BackHandler(enabled = hasDraft || saving) { if (!saving) showDiscardConfirm = true }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text("Discard ticket draft?") },
+            text = { Text("Your ticket details have not been saved.") },
+            confirmButton = {
+                TextButton(onClick = { showDiscardConfirm = false; navController.popBackStack() }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text("Keep editing") } }
+        )
+    }
 
     LaunchedEffect(Unit) {
-        // Load all pages until we have enough clients for the picker
+        // The API retains client_id; the app calls these records departments.
         clients = runCatching { ApiClient.service().getClients(search = "", page = 1) }.getOrNull()
         categories = runCatching { ApiClient.service().getTicketCategories() }.getOrDefault(emptyList())
     }
 
     fun submit() {
+        if (saving) return
         if (subject.isBlank()) { error = "Subject required"; return }
         saving = true; error = null
         scope.launch {
@@ -70,7 +96,7 @@ fun CreateTicketScreen(navController: NavController) {
                 )
                 navController.popBackStack()
             } catch (e: Exception) {
-                error = userMessage(e)
+                error = "Could not confirm ticket creation. Check Tickets before trying again: ${userMessage(e)}"
             } finally { saving = false }
         }
     }
@@ -128,7 +154,7 @@ fun CreateTicketScreen(navController: NavController) {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = ::goBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back")
                     }
                 }
@@ -220,7 +246,7 @@ fun CreateTicketScreen(navController: NavController) {
                 }
             }
 
-            // Client & category card
+            // Department & category card
             Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

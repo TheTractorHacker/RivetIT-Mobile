@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +35,7 @@ fun TicketChatScreen(ticketId: Int, navController: NavController) {
     var chatDisabled by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
-    var draft by remember { mutableStateOf("") }
+    var draft by rememberSaveable(ticketId) { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -102,16 +103,18 @@ fun TicketChatScreen(ticketId: Int, navController: NavController) {
                             enabled = draft.isNotBlank() && !sending,
                             onClick = {
                                 val text = draft.trim()
-                                draft = ""
-                                sending = true
-                                scope.launch {
-                                    try {
-                                        ApiClient.service().sendChatMessage(ticketId, SendChatMessageRequest(text))
-                                        poll()
-                                    } catch (e: Exception) {
-                                        errorMsg = "Failed to send message"
-                                    } finally {
-                                        sending = false
+                                if (text.isNotEmpty() && !sending) {
+                                    sending = true
+                                    scope.launch {
+                                        try {
+                                            ApiClient.service().sendChatMessage(ticketId, SendChatMessageRequest(text))
+                                            if (draft.trim() == text) draft = ""
+                                            poll()
+                                        } catch (e: Exception) {
+                                            errorMsg = "Message was not confirmed. Check the conversation before trying again."
+                                        } finally {
+                                            sending = false
+                                        }
                                     }
                                 }
                             }

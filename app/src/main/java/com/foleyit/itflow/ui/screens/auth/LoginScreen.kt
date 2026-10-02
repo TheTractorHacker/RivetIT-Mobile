@@ -33,7 +33,7 @@ import com.foleyit.itflow.data.api.FcmTokenRequest
 import com.foleyit.itflow.data.api.LoginRequest
 import com.foleyit.itflow.data.api.PasskeyCompleteRequest
 import com.foleyit.itflow.data.local.AppPreferences
-import com.foleyit.itflow.ui.components.FoleyItLogoMark
+import com.foleyit.itflow.ui.components.RivetItLogoMark
 import com.foleyit.itflow.ui.util.userMessage
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.gson.Gson
@@ -86,7 +86,7 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
                 val resp = withContext(Dispatchers.IO) {
                     ApiClient.service().login(LoginRequest(
                         username = username.trim(), password = password,
-                        device_name = "ITFlow Internal IT Android",
+                        device_name = "RivetIT Android",
                         totp_code = if (totpCode.isNotBlank()) totpCode.trim() else null
                     ))
                 }
@@ -173,7 +173,7 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
                 .background(logoGradient, MaterialTheme.shapes.extraLarge),
             contentAlignment = Alignment.Center
         ) {
-            FoleyItLogoMark(
+            RivetItLogoMark(
                 modifier = Modifier.size(40.dp),
                 markColor = MaterialTheme.colorScheme.onPrimary,
             )

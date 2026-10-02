@@ -18,7 +18,7 @@ object NotificationHelper {
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "ITFlow Internal IT Notifications",
+            "RivetIT Notifications",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "New tickets, replies, and assignments"
@@ -40,7 +40,7 @@ object NotificationHelper {
         // client PII) should only be shown once the device is unlocked.
         val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("ITFlow Internal IT")
+            .setContentTitle("RivetIT")
             .setContentText("New ticket update")
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)

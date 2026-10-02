@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,7 +58,9 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     var timerStart by remember { mutableLongStateOf(0L) }
 
     // Sheets
-    var showReply by remember { mutableStateOf(false) }
+    var showReply by rememberSaveable { mutableStateOf(false) }
+    var replySubmitting by remember { mutableStateOf(false) }
+    var replyError by remember { mutableStateOf<String?>(null) }
     var showStatusPicker by remember { mutableStateOf(false) }
     var showAddWorksheet by remember { mutableStateOf(false) }
     var showAddOuttake by remember { mutableStateOf(false) }
@@ -154,20 +157,27 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
         ReplySheet(
             defaultTimeWorked = if (elapsed > 0) timeWorkedString else "",
             statuses = statuses,
-            onDismiss = { showReply = false },
+            submitting = replySubmitting,
+            errorMessage = replyError,
+            onDismiss = { if (!replySubmitting) { showReply = false; replyError = null } },
             onSubmit = { reply, type, timeWorked, onsite, statusId ->
-                scope.launch {
-                    runCatching {
-                        ApiClient.service().addReply(id, reply, type = type,
-                            timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
-                    }.onSuccess {
-                        load()
-                        if (elapsed > 0) elapsed = 0L
-                    }.onFailure {
-                        snackbar.showSnackbar("Failed to save note: ${userMessage(it)}")
+                if (!replySubmitting) {
+                    replySubmitting = true
+                    replyError = null
+                    scope.launch {
+                        try {
+                            ApiClient.service().addReply(id, reply, type = type,
+                                timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
+                            showReply = false
+                            load()
+                            if (elapsed > 0) elapsed = 0L
+                        } catch (e: Exception) {
+                            replyError = "Could not confirm the save. Check ticket history before trying again: ${userMessage(e)}"
+                        } finally {
+                            replySubmitting = false
+                        }
                     }
                 }
-                showReply = false
             }
         )
     }
@@ -303,7 +313,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.AutoMirrored.Outlined.StickyNote2, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp)); Text("Add Note")
+                        Spacer(Modifier.width(6.dp)); Text("Reply / note")
                     }
                 }
             }
@@ -404,9 +414,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         }
                     }
 
-                    // Charges - hidden entirely when the server has ticket charges disabled
-                    // (config_module_enable_ticket_charges), matching agent/ticket.php's own
-                    // gating of this section, not just the add-charge affordance.
+                    // The internal edition hides charges when this module is disabled.
                     if (chargesEnabled) {
                         item {
                             ChargesCard(charges, onSaveCharge = { name, desc, qty, price ->
@@ -497,15 +505,18 @@ private fun statusIcon(name: String): androidx.compose.ui.graphics.vector.ImageV
 private fun ReplySheet(
     defaultTimeWorked: String,
     statuses: List<TicketStatus>,
+    submitting: Boolean,
+    errorMessage: String?,
     onDismiss: () -> Unit,
     onSubmit: (reply: String, type: String, timeWorked: String, onsite: Boolean, statusId: Int?) -> Unit
 ) {
-    var reply by remember { mutableStateOf("") }
+    var reply by rememberSaveable { mutableStateOf("") }
+    var replyType by rememberSaveable { mutableStateOf("note") }
     val (initialH, initialM) = remember(defaultTimeWorked) { parseHoursMinutes(defaultTimeWorked) }
-    var hours by remember { mutableIntStateOf(initialH) }
-    var minutes by remember { mutableIntStateOf(initialM) }
-    var onsite by remember { mutableStateOf(false) }
-    var selectedStatusId by remember { mutableStateOf<Int?>(null) }
+    var hours by rememberSaveable { mutableIntStateOf(initialH) }
+    var minutes by rememberSaveable { mutableIntStateOf(initialM) }
+    var onsite by rememberSaveable { mutableStateOf(false) }
+    var selectedStatusId by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Mirrors the web app's reply-form "Submit & set status to…" dropdown, which excludes
     // "New" (not a status a reply returns a ticket to) and "Closed" (only ever reached via
@@ -514,12 +525,31 @@ private fun ReplySheet(
         statuses.filter { it.name != "New" && it.name != "Closed" }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = { if (!submitting) onDismiss() }) {
         Column(modifier = Modifier
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()) {
-            Text("Add Note", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Reply to ticket", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(12.dp))
+            Text("Visibility", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = replyType == "note", onClick = { replyType = "note" },
+                    label = { Text("Internal note") },
+                    leadingIcon = { Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp)) }
+                )
+                FilterChip(
+                    selected = replyType == "reply", onClick = { replyType = "reply" },
+                    label = { Text("Public reply") },
+                    leadingIcon = { Icon(Icons.Outlined.Public, null, Modifier.size(16.dp)) }
+                )
+            }
+            Text(if (replyType == "note") "Only technicians can see this note."
+                 else "Department contacts can see this reply.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             // Remote / On-Site toggle
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -540,7 +570,7 @@ private fun ReplySheet(
             OutlinedTextField(
                 value = reply, onValueChange = { reply = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Note") },
+                label = { Text(if (replyType == "note") "Internal note" else "Public reply") },
                 minLines = 4, maxLines = 8
             )
             Spacer(Modifier.height(16.dp))
@@ -573,21 +603,29 @@ private fun ReplySheet(
                     }
                 }
             }
+            errorMessage?.let {
+                Spacer(Modifier.height(12.dp))
+                Text(it, color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+            }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss, enabled = !submitting) { Text("Cancel") }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
-                        if (reply.isNotBlank()) {
+                        if (reply.isNotBlank() && !submitting) {
                             val timeWorked = if (hours > 0 || minutes > 0)
                                 "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00"
                             else ""
-                            onSubmit(reply, "note", timeWorked, onsite, selectedStatusId)
+                            onSubmit(reply, replyType, timeWorked, onsite, selectedStatusId)
                         }
                     },
-                    enabled = reply.isNotBlank()
-                ) { Text("Add Note") }
+                    enabled = reply.isNotBlank() && !submitting
+                ) {
+                    if (submitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Text(if (replyType == "note") "Add internal note" else "Send public reply")
+                }
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -637,6 +675,7 @@ private fun ReplyCard(reply: TicketReply, ticketId: Int, onDeleted: () -> Unit, 
     // filter); 'note' is kept for reading older entries created before that fix.
     val isNote = reply.type.equals("note", ignoreCase = true) || reply.type.equals("Internal", ignoreCase = true)
     val isFromCustomer = reply.type.equals("Client", ignoreCase = true)
+    val isPublicReply = reply.type.equals("reply", ignoreCase = true) || reply.type.equals("agent", ignoreCase = true)
     val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -701,6 +740,14 @@ private fun ReplyCard(reply: TicketReply, ticketId: Int, onDeleted: () -> Unit, 
                     Surface(color = MaterialTheme.colorScheme.secondaryContainer,
                         shape = MaterialTheme.shapes.extraSmall) {
                         Text("Customer", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
+                if (isPublicReply) {
+                    Surface(color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = MaterialTheme.shapes.extraSmall) {
+                        Text("Public reply", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
@@ -881,7 +928,7 @@ private fun WorksheetsCard(
                 verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("Outtake Forms", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text("Department signs on pickup", style = MaterialTheme.typography.bodySmall,
+                    Text("Contact signs on pickup", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline)
                 }
                 onAddOuttake?.let { action ->
@@ -1208,7 +1255,7 @@ private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: () -> Unit) {
                 fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Creates a sign-off form so the department can sign when picking up their device.",
+                "Creates a sign-off form so the contact can sign when picking up their device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()

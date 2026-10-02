@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "ITFlow Internal IT"
+rootProject.name = "RivetIT"
 include(":app")

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +24,7 @@ import com.foleyit.itflow.ui.components.EmptyScreen
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadMoreRow
 import com.foleyit.itflow.ui.components.LoadingScreen
+import com.foleyit.itflow.ui.components.PagedListStatus
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.fmtDate
 import com.foleyit.itflow.ui.util.rememberPagedList
@@ -31,11 +33,11 @@ import com.foleyit.itflow.ui.util.userMessage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeBaseScreen(navController: NavController) {
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     var categories by remember { mutableStateOf<List<KbCategory>>(emptyList()) }
     var selectedCategory by remember { mutableStateOf<Int?>(null) }
 
-    val list = rememberPagedList(selectedCategory) { page, q ->
+    val list = rememberPagedList(selectedCategory, initialQuery = search) { page, q ->
         ApiClient.service().getKbArticles(categoryId = selectedCategory, search = q, page = page)
     }
 
@@ -108,8 +110,8 @@ fun KnowledgeBaseScreen(navController: NavController) {
 
             val ls = list.state
             when {
-                ls.isRefreshing -> LoadingScreen()
-                ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+                ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+                ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
                 ls.items.isEmpty() -> EmptyScreen("No articles found", Icons.AutoMirrored.Outlined.Article)
                 else -> {
                     LazyColumn(
@@ -117,6 +119,9 @@ fun KnowledgeBaseScreen(navController: NavController) {
                         contentPadding = PaddingValues(12.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (ls.isRefreshing || ls.error != null) {
+                            item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                        }
                         items(ls.items, key = { it.id }) { article ->
                             KbArticleCard(article) {
                                 navController.navigate(Screen.KbArticleDetail.go(article.id))

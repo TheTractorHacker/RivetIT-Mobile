@@ -24,8 +24,7 @@ object ThemeMode {
  * palettes — still not Material You dynamic/wallpaper-derived color (that was deliberately
  * ruled out previously so the app looks the same, deliberately designed, on every device);
  * these are curated brand palettes the user explicitly picks, not device-dependent ones.
- * FOLEYIT (the operating company's own brand identity) is the default; TEAL is the app's
- * original/real fallback seed.
+ * TEAL is the RivetIT default; the other palettes remain available as user choices.
  */
 enum class ColorSeed(val id: String) {
     FOLEYIT("foleyit"),
@@ -35,7 +34,7 @@ enum class ColorSeed(val id: String) {
     VIOLET("violet");
 
     companion object {
-        val DEFAULT = VIOLET
+        val DEFAULT = TEAL
         fun fromId(id: String?): ColorSeed = entries.find { it.id == id } ?: DEFAULT
     }
 }
@@ -91,7 +90,7 @@ private val TealDark = darkColorScheme(
     surfaceContainer = Color(0xFF212425), surfaceContainerHigh = Color(0xFF2B2F30), surfaceContainerHighest = Color(0xFF363A3B),
 )
 
-// FoleyIT — the operating company's own brand identity (blue/cyan/green). New default seed.
+// FoleyIT — optional blue/cyan/green palette.
 private val FoleyitLight = lightColorScheme(
     primary = Color(0xFF0066CC), onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFC4E1FF), onPrimaryContainer = Color(0xFF05162C),

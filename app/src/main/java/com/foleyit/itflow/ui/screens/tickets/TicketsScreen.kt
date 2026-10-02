@@ -5,12 +5,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,20 +43,24 @@ private fun ticketStatusColor(hex: String?): Color = try {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsScreen(navController: NavController) {
-    var search by remember { mutableStateOf("") }
-    var mineOnly by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var priorityFilter by remember { mutableStateOf<String?>(null) }
-    var onsiteFilter by remember { mutableStateOf<Int?>(null) }  // null=all, 1=onsite, 0=remote
-    var categoryFilter by remember { mutableStateOf<Int?>(null) }
+    var search by rememberSaveable { mutableStateOf("") }
+    var mineOnly by rememberSaveable { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var priorityFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var onsiteFilter by rememberSaveable { mutableStateOf<Int?>(null) }  // null=all, 1=onsite, 0=remote
+    var categoryFilter by rememberSaveable { mutableStateOf<Int?>(null) }
     var categories by remember { mutableStateOf<List<TicketCategory>>(emptyList()) }
     var savedViews by remember { mutableStateOf<List<SavedTicketView>>(emptyList()) }
-    var activeView by remember { mutableStateOf<SavedTicketView?>(null) }
-    var showViewsMenu by remember { mutableStateOf(false) }
-    var showFilterSheet by remember { mutableStateOf(false) }
+    var activeViewId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val activeView = savedViews.firstOrNull { it.id == activeViewId }
+    var showViewsMenu by rememberSaveable { mutableStateOf(false) }
+    var showFilterSheet by rememberSaveable { mutableStateOf(false) }
+    val openListState = rememberLazyListState()
+    val closedListState = rememberLazyListState()
     val filtersActive = priorityFilter != null || onsiteFilter != null || categoryFilter != null
 
-    val list = rememberPagedList(selectedTab, mineOnly, priorityFilter, onsiteFilter, categoryFilter, activeView) { page, q ->
+    val list = rememberPagedList(selectedTab, mineOnly, priorityFilter, onsiteFilter, categoryFilter, activeView,
+        initialQuery = search) { page, q ->
         val view = activeView
         if (view != null) {
             val p = view.params
@@ -82,7 +88,7 @@ fun TicketsScreen(navController: NavController) {
         }
     }
 
-    fun applyView(view: SavedTicketView) { activeView = view }
+    fun applyView(view: SavedTicketView) { activeViewId = view.id }
 
     LaunchedEffect(Unit) {
         runCatching { categories = ApiClient.service().getTicketCategories() }
@@ -173,7 +179,7 @@ fun TicketsScreen(navController: NavController) {
                         Text(view.name, modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        IconButton(onClick = { activeView = null }, modifier = Modifier.size(28.dp)) {
+                        IconButton(onClick = { activeViewId = null }, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Outlined.Close, "Clear view", Modifier.size(14.dp))
                         }
                     }
@@ -217,16 +223,30 @@ fun TicketsScreen(navController: NavController) {
         }
 
         val ls = list.state
+        if (ls.items.isNotEmpty() && ls.isRefreshing) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        if (ls.items.isNotEmpty() && ls.error != null) {
+            Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(userMessage(ls.error), modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer)
+                    TextButton(onClick = list::retry) { Text("Retry") }
+                }
+            }
+        }
         when {
-            ls.isRefreshing -> LoadingScreen()
-            ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+            ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+            ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
             ls.items.isEmpty() -> EmptyScreen("No tickets found", Icons.Outlined.ConfirmationNumber)
             selectedTab == 0 -> {
                 // Open tickets — grouped by status
                 val tickets = ls.items
                 val statusOrder = tickets.map { it.status ?: "Unknown" }.distinct()
                 val grouped = tickets.groupBy { it.status ?: "Unknown" }
-                LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                LazyColumn(state = openListState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                     statusOrder.forEach { status ->
                         val group = grouped[status] ?: return@forEach
                         val color = group.firstOrNull()?.statusColor
@@ -265,6 +285,7 @@ fun TicketsScreen(navController: NavController) {
             else -> {
                 // Closed tickets — simple flat list
                 LazyColumn(
+                    state = closedListState,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {

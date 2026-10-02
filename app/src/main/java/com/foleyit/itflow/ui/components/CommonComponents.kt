@@ -104,6 +104,30 @@ fun LoadMoreRow(loading: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** Keeps existing list rows in place while a refresh runs or fails. */
+@Composable
+fun PagedListStatus(refreshing: Boolean, error: String?, onRetry: () -> Unit) {
+    if (refreshing) {
+        Column {
+            Text("Updating results…", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    } else if (error != null) {
+        Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(error, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer)
+                TextButton(onClick = onRetry) { Text("Retry") }
+            }
+        }
+    }
+}
+
 @Composable
 fun SectionLabel(text: String) {
     Text(

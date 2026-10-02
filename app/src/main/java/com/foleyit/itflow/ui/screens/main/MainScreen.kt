@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import com.foleyit.itflow.data.api.ApiClient
@@ -104,7 +105,13 @@ fun MainScreen(
 
     fun closeDrawerAndNavigate(route: String) {
         scope.launch { drawerState.close() }
-        navController.navigate(route) { launchSingleTop = true }
+        navController.navigate(route) {
+            launchSingleTop = true
+            if (route in BOTTOM_NAV_ROUTES) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                restoreState = true
+            }
+        }
     }
 
     LaunchedEffect(deepLinkRoute) {
@@ -126,8 +133,9 @@ fun MainScreen(
 
     fun navigateToTab(route: String) {
         navController.navigate(route) {
-            popUpTo(Screen.Dashboard.route) { inclusive = false }
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
+            restoreState = true
         }
     }
 
@@ -171,7 +179,7 @@ fun MainScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             BrandMark(size = 28.dp)
                             Spacer(Modifier.width(10.dp))
-                            Text("ITFlow Internal IT", style = MaterialTheme.typography.titleLarge)
+                            Text("RivetIT", style = MaterialTheme.typography.titleLarge)
                         }
                     },
                     actions = {

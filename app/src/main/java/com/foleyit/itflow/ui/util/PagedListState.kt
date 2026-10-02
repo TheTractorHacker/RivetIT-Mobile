@@ -37,35 +37,52 @@ data class PagedListUiState<T>(
 class PagedListController<T>(
     private val scope: CoroutineScope,
     private val debounceMs: Long = 300,
+    initialQuery: String = "",
     private val fetch: suspend (page: Int, search: String) -> PagedResponse<T>
 ) {
     var state by mutableStateOf(PagedListUiState<T>())
         private set
 
-    private var query: String = ""
+    private var query: String = initialQuery
     private var searchJob: Job? = null
+    private var requestJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var requestVersion = 0
 
     /** Call from a search field's onValueChange; debounces and refreshes automatically. */
     fun onSearchChanged(newQuery: String) {
         query = newQuery
         searchJob?.cancel()
+        requestJob?.cancel()
+        loadMoreJob?.cancel()
+        requestVersion++
+        state = state.copy(isRefreshing = true, error = null)
         searchJob = scope.launch {
             delay(debounceMs)
-            refresh()
+            startRefresh()
         }
     }
 
     /** Reloads page 1 immediately (no debounce) — used for initial load, retry, and filter changes. */
     fun refresh() {
         searchJob?.cancel()
+        startRefresh()
+    }
+
+    private fun startRefresh() {
+        requestJob?.cancel()
+        loadMoreJob?.cancel()
+        val version = ++requestVersion
         state = state.copy(isRefreshing = true, error = null)
-        scope.launch {
+        requestJob = scope.launch {
             runCatching { fetch(1, query) }
                 .onSuccess { resp ->
-                    state = PagedListUiState(items = resp.data, page = 1, total = resp.total, isRefreshing = false)
+                    if (version == requestVersion) {
+                        state = PagedListUiState(items = resp.data, page = 1, total = resp.total, isRefreshing = false)
+                    }
                 }
                 .onFailure { e ->
-                    state = state.copy(isRefreshing = false, error = e)
+                    if (version == requestVersion) state = state.copy(isRefreshing = false, error = e)
                 }
         }
     }
@@ -73,25 +90,35 @@ class PagedListController<T>(
     fun loadMore() {
         if (state.isLoadingMore || state.isRefreshing || !state.hasMore) return
         val nextPage = state.page + 1
+        val version = requestVersion
         state = state.copy(isLoadingMore = true)
-        scope.launch {
+        loadMoreJob = scope.launch {
             runCatching { fetch(nextPage, query) }
                 .onSuccess { resp ->
-                    state = state.copy(
-                        items = state.items + resp.data,
-                        page = nextPage,
-                        total = resp.total,
-                        isLoadingMore = false
-                    )
+                    if (version == requestVersion) {
+                        state = state.copy(
+                            items = state.items + resp.data,
+                            page = nextPage,
+                            total = resp.total,
+                            isLoadingMore = false
+                        )
+                    }
                 }
                 .onFailure {
                     // Keep existing items; user can trigger loadMore() again (e.g. scroll/tap retry).
-                    state = state.copy(isLoadingMore = false)
+                    if (version == requestVersion) state = state.copy(isLoadingMore = false)
                 }
         }
     }
 
     fun retry() = refresh()
+
+    fun cancel() {
+        requestVersion++
+        searchJob?.cancel()
+        requestJob?.cancel()
+        loadMoreJob?.cancel()
+    }
 }
 
 /**
@@ -102,10 +129,12 @@ class PagedListController<T>(
 fun <T> rememberPagedList(
     vararg resetKeys: Any?,
     debounceMs: Long = 300,
+    initialQuery: String = "",
     fetch: suspend (page: Int, search: String) -> PagedResponse<T>
 ): PagedListController<T> {
     val scope = rememberCoroutineScope()
-    val controller = remember(*resetKeys) { PagedListController(scope, debounceMs, fetch) }
+    val controller = remember(*resetKeys) { PagedListController(scope, debounceMs, initialQuery, fetch) }
     LaunchedEffect(*resetKeys) { controller.refresh() }
+    androidx.compose.runtime.DisposableEffect(controller) { onDispose { controller.cancel() } }
     return controller
 }

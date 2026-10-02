@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,7 @@ import com.foleyit.itflow.ui.components.EmptyScreen
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadMoreRow
 import com.foleyit.itflow.ui.components.LoadingScreen
+import com.foleyit.itflow.ui.components.PagedListStatus
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.fmtDate
 import com.foleyit.itflow.ui.util.rememberPagedList
@@ -31,10 +33,10 @@ private val STATUS_FILTERS = listOf("open" to "Open", "completed" to "Completed"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectsScreen(navController: NavController) {
-    var search by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
     var status by remember { mutableStateOf("open") }
 
-    val list = rememberPagedList<ProjectSummary>(status) { page, q ->
+    val list = rememberPagedList<ProjectSummary>(status, initialQuery = search) { page, q ->
         ApiClient.service().getProjects(search = q, page = page, status = status)
     }
 
@@ -73,14 +75,17 @@ fun ProjectsScreen(navController: NavController) {
 
             val ls = list.state
             when {
-                ls.isRefreshing -> LoadingScreen()
-                ls.error != null -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
+                ls.isRefreshing && ls.items.isEmpty() -> LoadingScreen()
+                ls.error != null && ls.items.isEmpty() -> ErrorScreen(userMessage(ls.error), onRetry = list::retry)
                 ls.items.isEmpty() -> EmptyScreen("No projects found", Icons.Outlined.AccountTree)
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (ls.isRefreshing || ls.error != null) {
+                            item(key = "refresh_status") { PagedListStatus(ls.isRefreshing, ls.error?.let(::userMessage), list::retry) }
+                        }
                         items(ls.items, key = { it.id }) { p ->
                             ProjectCard(p) { navController.navigate(Screen.ProjectDetail.go(p.id)) }
                         }
