@@ -9,8 +9,7 @@ class DeepLinksTest {
     @Test
     fun `allows known top-level routes`() {
         val allowed = listOf(
-            "tickets", "clients", "assets", "credentials", "quotes", "invoices",
-            "expenses", "notifications", "appointments", "worksheets", "outtakes",
+            "tickets", "clients", "assets", "credentials", "notifications", "appointments", "worksheets", "outtakes",
             "search", "reports", "scan", "profile", "kb", "alerts"
         )
         allowed.forEach {
@@ -33,6 +32,9 @@ class DeepLinksTest {
     fun `rejects unknown top-level resource`() {
         assertFalse(DeepLinks.ALLOWED_ROUTE.matches("evil"))
         assertFalse(DeepLinks.ALLOWED_ROUTE.matches("../../malicious"))
+        assertFalse(DeepLinks.ALLOWED_ROUTE.matches("quotes/1"))
+        assertFalse(DeepLinks.ALLOWED_ROUTE.matches("invoices/1"))
+        assertFalse(DeepLinks.ALLOWED_ROUTE.matches("expenses"))
     }
 
     @Test

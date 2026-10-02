@@ -22,13 +22,16 @@ object ApiClient {
     private var _service: ApiService? = null
     private var _appContext: Context? = null
     private var _cachedProfile: UserProfile? = null
+    private var _httpCache: Cache? = null
 
     val serverUrl get() = _serverUrl
 
     var onUnauthorized: (() -> Unit)? = null
 
     fun init(serverUrl: String, token: String?, trustedCertSha: String? = null, context: Context? = null) {
-        _serverUrl = serverUrl.trimEnd('/')
+        val cleanUrl = serverUrl.trimEnd('/')
+        if (_serverUrl.isNotEmpty() && (_serverUrl != cleanUrl || _token != token)) clearCachedResponses()
+        _serverUrl = cleanUrl
         _token = token
         _trustedCertSha = trustedCertSha
         context?.let { _appContext = it.applicationContext }
@@ -36,8 +39,8 @@ object ApiClient {
         _service = buildService()
     }
 
-    fun setToken(token: String) { _token = token; _cachedProfile = null; _service = buildService() }
-    fun clearToken() { _token = null; _cachedProfile = null; _service = buildService() }
+    fun setToken(token: String) { if (_token != token) clearCachedResponses(); _token = token; _cachedProfile = null; _service = buildService() }
+    fun clearToken() { clearCachedResponses(); _token = null; _cachedProfile = null; _service = buildService() }
     fun setTrustedCert(sha: String?) { _trustedCertSha = sha; _service = buildService() }
 
     fun service(): ApiService = _service ?: error("ApiClient not initialized")
@@ -47,6 +50,10 @@ object ApiClient {
     // once per screen. Invalidated in init()/setToken()/clearToken() so switching accounts
     // never leaks the previous user's cached profile/module flags.
     suspend fun profile(): UserProfile = _cachedProfile ?: service().getProfile().also { _cachedProfile = it }
+
+    private fun clearCachedResponses() {
+        try { _httpCache?.evictAll() } catch (_: Exception) { /* A failed eviction must not block sign-out. */ }
+    }
 
     private fun isOnline(): Boolean {
         val ctx = _appContext ?: return true
@@ -70,7 +77,7 @@ object ApiClient {
             .apply {
                 _appContext?.let { ctx ->
                     val cacheDir = File(ctx.cacheDir, "http_cache")
-                    cache(Cache(cacheDir, 10L * 1024 * 1024))
+                    cache(_httpCache ?: Cache(cacheDir, 10L * 1024 * 1024).also { _httpCache = it })
                 }
             }
             // Serve stale cache when offline
@@ -82,12 +89,13 @@ object ApiClient {
                 } else chain.request()
                 chain.proceed(request)
             }
-            // Cache GET responses for 5 minutes on the network side
+            // Cache successful GETs only. A cached 404 or 401 makes Retry
+            // repeat an obsolete failure even after the server recovers.
             .addNetworkInterceptor { chain ->
                 val response = chain.proceed(chain.request())
                 if (chain.request().method == "GET") {
                     response.newBuilder()
-                        .header("Cache-Control", "public, max-age=300")
+                        .header("Cache-Control", if (response.isSuccessful) "private, max-age=300" else "no-store")
                         .build()
                 } else response
             }

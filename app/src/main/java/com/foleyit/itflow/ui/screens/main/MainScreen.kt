@@ -37,13 +37,10 @@ import com.foleyit.itflow.ui.screens.contracts.*
 import com.foleyit.itflow.ui.screens.clients.*
 import com.foleyit.itflow.ui.screens.credentials.*
 import com.foleyit.itflow.ui.screens.dashboard.DashboardScreen
-import com.foleyit.itflow.ui.screens.expenses.*
-import com.foleyit.itflow.ui.screens.invoices.*
 import com.foleyit.itflow.ui.screens.kb.KbArticleDetailScreen
 import com.foleyit.itflow.ui.screens.kb.KnowledgeBaseScreen
 import com.foleyit.itflow.ui.screens.notifications.NotificationsScreen
 import com.foleyit.itflow.ui.screens.alerts.AlertsScreen
-import com.foleyit.itflow.ui.screens.quotes.*
 import com.foleyit.itflow.ui.screens.tickets.*
 import com.foleyit.itflow.ui.screens.search.SearchScreen
 import com.foleyit.itflow.ui.screens.reports.*
@@ -57,8 +54,7 @@ import kotlinx.coroutines.withContext
 private val ROOT_ROUTES = setOf(
     Screen.Dashboard.route, Screen.Tickets.route, Screen.Clients.route,
     Screen.Assets.route, Screen.Projects.route, Screen.Contracts.route, Screen.Appointments.route,
-    Screen.Credentials.route, Screen.Quotes.route,
-    Screen.Invoices.route, Screen.Expenses.route,
+    Screen.Credentials.route,
     Screen.Notifications.route, Screen.Alerts.route
 )
 
@@ -81,7 +77,6 @@ fun MainScreen(
     var userName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
     var hasUnreadNotifications by remember { mutableStateOf(false) }
-    var billingNavEnabled by remember { mutableStateOf(false) }
 
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
     val isDarkMode = when (themeMode) {
@@ -98,9 +93,6 @@ fun MainScreen(
         } catch (_: Exception) {
             // Chrome badge only — a failed fetch here shouldn't block rendering the screen.
         }
-        // Fail-closed (hidden) on error or against a server that doesn't send `modules` yet.
-        billingNavEnabled = runCatching { ApiClient.profile() }.getOrNull()?.modules
-            ?.let { it.accountingEnabled || it.ticketChargesEnabled } ?: false
     }
 
     fun closeDrawerAndNavigate(route: String) {
@@ -158,7 +150,6 @@ fun MainScreen(
                 userName = userName,
                 userEmail = userEmail,
                 hasUnreadNotifications = hasUnreadNotifications,
-                billingNavEnabled = billingNavEnabled,
                 isDarkMode = isDarkMode,
                 onToggleDarkMode = { dark -> scope.launch { prefs.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT) } },
                 onNavigate = ::closeDrawerAndNavigate,
@@ -167,6 +158,10 @@ fun MainScreen(
         }
     ) {
     Scaffold(
+        // Detail screens own their system-bar insets through their inner Scaffold.
+        // Applying the outer safe-drawing inset as well left a blank band above
+        // their top app bars and reduced the usable height on a phone.
+        contentWindowInsets = if (isRootScreen) ScaffoldDefaults.contentWindowInsets else WindowInsets(0, 0, 0, 0),
         topBar = {
             if (isRootScreen) {
                 TopAppBar(
@@ -266,16 +261,6 @@ fun MainScreen(
             composable(Screen.CredDetail.route) {
                 CredentialDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
-            composable(Screen.Quotes.route) { QuotesScreen(navController) }
-            composable(Screen.QuoteDetail.route) {
-                QuoteDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
-            }
-            composable(Screen.Invoices.route) { InvoicesScreen(navController) }
-            composable(Screen.InvoiceDetail.route) {
-                InvoiceDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
-            }
-            composable(Screen.Expenses.route) { ExpensesScreen(navController) }
-            composable(Screen.AddExpense.route) { AddExpenseScreen { navController.popBackStack() } }
             composable(Screen.Notifications.route) { NotificationsScreen() }
             composable(Screen.Alerts.route) { AlertsScreen(navController) }
             composable(Screen.Profile.route) { ProfileScreen(navController, prefs, onChangeServer, onLoggedOut) }
@@ -298,11 +283,6 @@ fun MainScreen(
             composable(Screen.TimeByTechReport.route) { TimeByTechReportScreen(navController) }
             composable(Screen.TechPerformanceReport.route) { TechPerformanceReportScreen(navController) }
             composable(Screen.OverviewReport.route) { OverviewReportScreen(navController) }
-            composable(Screen.UnbilledTicketsReport.route) { UnbilledTicketsReportScreen(navController) }
-            composable(Screen.ClientsWithBalanceReport.route) { ClientsWithBalanceReportScreen(navController) }
-            composable(Screen.IncomeSummaryReport.route) { IncomeSummaryReportScreen(navController) }
-            composable(Screen.ExpenseSummaryReport.route) { ExpenseSummaryReportScreen(navController) }
-            composable(Screen.ProfitLossReport.route) { ProfitLossReportScreen(navController) }
             composable(Screen.ExpiringReport.route) { ExpiringReportScreen(navController) }
             composable(Screen.CsatReport.route) { CsatReportScreen(navController) }
             composable(Screen.RmmHealthReport.route) { RmmHealthReportScreen(navController) }

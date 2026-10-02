@@ -27,12 +27,6 @@ sealed class Screen(val route: String) {
     object ContractDetail: Screen("contracts/{id}")  { fun go(id: Int) = "contracts/$id" }
     object Credentials   : Screen("credentials")
     object CredDetail    : Screen("credentials/{id}"){ fun go(id: Int) = "credentials/$id" }
-    object Quotes        : Screen("quotes")
-    object QuoteDetail   : Screen("quotes/{id}")     { fun go(id: Int) = "quotes/$id" }
-    object Invoices      : Screen("invoices")
-    object InvoiceDetail : Screen("invoices/{id}")   { fun go(id: Int) = "invoices/$id" }
-    object Expenses      : Screen("expenses")
-    object AddExpense    : Screen("expenses/add")
     object Notifications : Screen("notifications")
     object Appointments  : Screen("appointments")
     object FillWorksheet : Screen("worksheets/{id}/fill") { fun go(id: Int) = "worksheets/$id/fill" }
@@ -46,11 +40,6 @@ sealed class Screen(val route: String) {
     object TimeByTechReport        : Screen("reports/time-by-tech")
     object TechPerformanceReport   : Screen("reports/tech-performance")
     object OverviewReport          : Screen("reports/overview")
-    object UnbilledTicketsReport   : Screen("reports/unbilled-tickets")
-    object ClientsWithBalanceReport: Screen("reports/clients-with-balance")
-    object IncomeSummaryReport     : Screen("reports/income-summary")
-    object ExpenseSummaryReport    : Screen("reports/expense-summary")
-    object ProfitLossReport        : Screen("reports/profit-loss")
     object ExpiringReport          : Screen("reports/expiring")
     object CsatReport              : Screen("reports/csat")
     object RmmHealthReport         : Screen("reports/rmm-health")

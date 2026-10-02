@@ -33,14 +33,6 @@ private val TICKET_REPORTS = listOf(
     ReportEntry("Overview", "Open tickets by priority, status, category", Icons.Outlined.PieChart, Screen.OverviewReport.route),
 )
 
-private val FINANCIAL_REPORTS = listOf(
-    ReportEntry("Income Summary", "Monthly income by category", Icons.Outlined.Paid, Screen.IncomeSummaryReport.route),
-    ReportEntry("Expense Summary", "Monthly expenses by category", Icons.Outlined.Receipt, Screen.ExpenseSummaryReport.route),
-    ReportEntry("Profit & Loss", "Income minus expenses by month", Icons.Outlined.Balance, Screen.ProfitLossReport.route),
-    ReportEntry("Unbilled Tickets", "Billable tickets not yet invoiced", Icons.Outlined.RequestQuote, Screen.UnbilledTicketsReport.route),
-    ReportEntry("Departments with a Balance", "Outstanding invoice balances", Icons.Outlined.AccountBalanceWallet, Screen.ClientsWithBalanceReport.route),
-)
-
 private val OPERATIONS_REPORTS = listOf(
     ReportEntry("Expiring Domains & Certs", "Renewals due in the next 30 days", Icons.Outlined.EventBusy, Screen.ExpiringReport.route),
 )
@@ -77,9 +69,6 @@ fun ReportsHubScreen(navController: NavController) {
 
             item { Spacer(Modifier.height(12.dp)); ReportSectionHeader("Support & Operations") }
             items(SUPPORT_OPERATIONS_REPORTS) { ReportCard(it) { navController.navigate(it.route) } }
-
-            item { Spacer(Modifier.height(12.dp)); ReportSectionHeader("Financial") }
-            items(FINANCIAL_REPORTS) { ReportCard(it) { navController.navigate(it.route) } }
 
             item { Spacer(Modifier.height(12.dp)); ReportSectionHeader("Operations") }
             items(OPERATIONS_REPORTS) { ReportCard(it) { navController.navigate(it.route) } }

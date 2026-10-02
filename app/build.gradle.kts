@@ -39,9 +39,12 @@ android {
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
             resValue("string", "app_name", "RivetIT Beta")
+            // Local UI audit only. Standard beta builds keep screenshot blocking.
+            buildConfigField("boolean", "SCREENSHOT_QA", (providers.gradleProperty("qaScreenshots").orNull == "true").toString())
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            buildConfigField("boolean", "SCREENSHOT_QA", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

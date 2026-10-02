@@ -1087,82 +1087,12 @@ private fun AddChargeForm(
     var desc by remember { mutableStateOf("") }
     var qty by remember { mutableIntStateOf(1) }
     var price by remember { mutableStateOf("") }
-    var productSearch by remember { mutableStateOf("") }
-    var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     val total = remember(qty, price) { qty * (price.toDoubleOrNull() ?: 0.0) }
     val currency = NumberFormat.getCurrencyInstance(Locale.US)
-
-    LaunchedEffect(Unit) {
-        products = runCatching { ApiClient.service().getProducts() }.getOrDefault(emptyList())
-    }
-
-    // Show the first several products as quick picks even before typing; narrow to a text match once searching.
-    val filteredProducts = remember(productSearch, products) {
-        if (productSearch.isBlank()) products.take(8)
-        else products.filter {
-            it.name.contains(productSearch, ignoreCase = true) ||
-            it.description?.contains(productSearch, ignoreCase = true) == true
-        }.take(8)
-    }
 
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text("Add Charge", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
-
-        // Product catalog search
-        if (products.isNotEmpty()) {
-            Text("From Catalog", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = productSearch,
-                onValueChange = { productSearch = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search products & services…") },
-                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                trailingIcon = {
-                    if (productSearch.isNotEmpty()) {
-                        IconButton(onClick = { productSearch = "" }) {
-                            Icon(Icons.Outlined.Clear, "Clear search")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge
-            )
-            if (filteredProducts.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                filteredProducts.forEach { product ->
-                    Surface(
-                        onClick = {
-                            name = product.name
-                            desc = product.description ?: ""
-                            price = product.price.toString()
-                            qty = 1
-                            productSearch = ""
-                        },
-                        shape = MaterialTheme.shapes.medium,
-                        // Contrasts against this form's own surfaceVariant panel background.
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                    ) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(product.name, fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.bodyMedium)
-                                product.type?.let {
-                                    Text(it, style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline)
-                                }
-                            }
-                            Text(currency.format(product.price), fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-            }
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-        }
 
         OutlinedTextField(value = name, onValueChange = { name = it },
             label = { Text("Item Name *") },

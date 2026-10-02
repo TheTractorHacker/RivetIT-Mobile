@@ -1,7 +1,6 @@
 package com.foleyit.itflow.data.api
 
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import retrofit2.http.*
 
 interface ApiService {
@@ -93,26 +92,6 @@ interface ApiService {
     // but a missing/expired token must never block a crash report from going out.
     @POST("crash-reports")
     suspend fun reportCrash(@Body body: CrashReportRequest): Map<String, Boolean>
-
-    @Headers("Cache-Control: no-store")
-    @GET("reports/unbilled-tickets")
-    suspend fun getUnbilledTicketsReport(@Query("year") year: Int? = null): UnbilledTicketsResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("reports/clients-with-balance")
-    suspend fun getClientsWithBalanceReport(): ClientsWithBalanceResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("reports/income-summary")
-    suspend fun getIncomeSummaryReport(@Query("year") year: Int? = null): FinancialSummaryResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("reports/expense-summary")
-    suspend fun getExpenseSummaryReport(@Query("year") year: Int? = null): FinancialSummaryResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("reports/profit-loss")
-    suspend fun getProfitLossReport(@Query("year") year: Int? = null): ProfitLossResponse
 
     // Ticket attachment upload
     @Multipart
@@ -261,41 +240,6 @@ interface ApiService {
         @Header("X-Biometric-Signature") signature: String
     ): CredentialDetail
 
-    // Quotes — no-store: responses contain guest_url, a bearer-token-like public link
-    @Headers("Cache-Control: no-store")
-    @GET("quotes")
-    suspend fun getQuotes(@Query("page") page: Int = 1): QuotesResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("quotes/{id}")
-    suspend fun getQuote(@Path("id") id: Int): QuoteDetail
-
-    // Invoices — no-store: responses contain guest_url, a bearer-token-like public link
-    @Headers("Cache-Control: no-store")
-    @GET("invoices")
-    suspend fun getInvoices(@Query("page") page: Int = 1): InvoicesResponse
-
-    @Headers("Cache-Control: no-store")
-    @GET("invoices/{id}")
-    suspend fun getInvoice(@Path("id") id: Int): InvoiceDetail
-
-    // Expenses
-    @Headers("Cache-Control: no-store")
-    @GET("expenses")
-    suspend fun getExpenses(@Query("page") page: Int = 1): ExpensesResponse
-
-    @Multipart
-    @POST("expenses")
-    suspend fun createExpense(
-        @Part("description") description: RequestBody,
-        @Part("amount") amount: RequestBody,
-        @Part("date") date: RequestBody,
-        @Part("currency") currency: RequestBody,
-        @Part("reference") reference: RequestBody,
-        @Part("payment_method") paymentMethod: RequestBody,
-        @Part receipt: MultipartBody.Part?
-    )
-
     // Notifications
     @GET("notifications")
     suspend fun getNotifications(@Query("page") page: Int = 1): NotificationsResponse
@@ -337,9 +281,6 @@ interface ApiService {
     @GET("worksheet-templates")
     suspend fun getWorksheetTemplates(): List<WorksheetTemplate>
 
-
-    @GET("products")
-    suspend fun getProducts(@Query("search") search: String = ""): List<Product>
 
     @POST("tickets/{id}/outtake")
     suspend fun createOuttake(@Path("id") id: Int, @Body body: CreateWorksheetRequest): Map<String, Int>

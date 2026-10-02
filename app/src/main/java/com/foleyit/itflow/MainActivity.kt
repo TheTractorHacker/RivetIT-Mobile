@@ -72,10 +72,12 @@ class MainActivity : FragmentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         if (isRooted() && BuildConfig.DEBUG) android.util.Log.w("ITFlow", "Device appears rooted.")
-        window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_SECURE,
-            android.view.WindowManager.LayoutParams.FLAG_SECURE
-        )
+        if (!BuildConfig.SCREENSHOT_QA) {
+            window.setFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                android.view.WindowManager.LayoutParams.FLAG_SECURE
+            )
+        }
         enableEdgeToEdge()
 
         val prefs = (application as ITFlowApplication).prefs
