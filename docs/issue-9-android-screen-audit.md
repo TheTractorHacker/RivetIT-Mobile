@@ -8,7 +8,7 @@ State markers: `L` loading, `E` empty, `R` retry/error, `—` no explicit marker
 |---|---|---|---|---|
 | `setup` | `app/src/main/java/com/foleyit/itflow/ui/screens/auth/ServerSetupScreen.kt` | — | — | Light/dark phone layout checked; certificate flow exercised |
 | `login` | `app/src/main/java/com/foleyit/itflow/ui/screens/auth/LoginScreen.kt` | `login`, `passkeyBegin`, `passkeyComplete`, `registerFcmToken` | — | Light/dark phone layout and password sign-in checked; MFA/passkey pending |
-| `dashboard` | `app/src/main/java/com/foleyit/itflow/ui/screens/dashboard/DashboardScreen.kt` | `getAlerts`, `getAppointments`, `getDashboard` | LR | Light phone layout and data load checked; dark/tablet/error pending |
+| `dashboard` | `app/src/main/java/com/foleyit/itflow/ui/screens/dashboard/DashboardScreen.kt` | `getAlerts`, `getAppointments`, `getDashboard` | LR | Light phone and tablet layouts with data checked; dark/error pending |
 | `tickets` | `app/src/main/java/com/foleyit/itflow/ui/screens/tickets/TicketsScreen.kt` | `getSavedTicketViews`, `getTicketCategories`, `getTickets` | LER | Light phone list, retry after API recovery, and 150% text checked; filters/dark/tablet pending |
 | `tickets/{id}` | `app/src/main/java/com/foleyit/itflow/ui/screens/tickets/TicketDetailScreen.kt` | `addCharge`, `addReply`, `completeWorksheet`, `createOuttake`, `createWorksheet`, `deleteOuttake`, `deleteReply`, `deleteWorksheet`, `getTicket`, `getTicketCharges`, `getTicketOuttakes`, `getTicketStatuses`, `getTicketWorksheets`, `getWorksheetTemplates`, `updateTicketStatus` | LR | Light phone detail/reply sheet checked; write flows/dark/tablet pending |
 | `tickets/{id}/chat` | `app/src/main/java/com/foleyit/itflow/ui/screens/tickets/TicketChatScreen.kt` | `getChatMessages`, `sendChatMessage` | L | Touched; device QA pending |
@@ -56,7 +56,9 @@ The reports screen had a doubled top safe-area inset. [Before](qa/issue-9/report
 
 At 150% Android font scale, the fixed-height search field on the ticket list clipped its prompt. [Before](qa/issue-9/tickets-large-before.png) and [after](qa/issue-9/tickets-large-after.png) screenshots show the corrected field. Asset, project, contract, and knowledge-base search fields had the same fixed-height pattern and now grow with text. Their full screen audits remain pending.
 
-This is a partial audit. No restricted-role, tablet, TalkBack, rotation, reduced-motion, deep-link, write-path, or representative-device performance result is claimed here.
+The [tablet dashboard](qa/issue-9/dashboard-tablet-light.png) was checked at a 1600×2560 emulator viewport. Its two-column metrics and ticket queue remained legible without overlap. This verifies one dashboard state, not the other tablet routes.
+
+This is a partial audit. No restricted-role, comprehensive tablet, TalkBack, rotation, reduced-motion, deep-link, write-path, or representative-device performance result is claimed here.
 
 ## Sheets and dialogs
 
