@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
@@ -43,6 +44,7 @@ private fun ticketStatusColor(hex: String?): Color = try {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsScreen(navController: NavController) {
+    val largeText = LocalDensity.current.fontScale >= 1.3f
     var search by rememberSaveable { mutableStateOf("") }
     var mineOnly by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -116,8 +118,8 @@ fun TicketsScreen(navController: NavController) {
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it; list.onSearchChanged(it) },
-                modifier = Modifier.weight(1f).height(48.dp),
-                placeholder = { Text("Search tickets…", style = MaterialTheme.typography.bodyMedium) },
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                placeholder = { Text(if (largeText) "Search" else "Search tickets…", style = MaterialTheme.typography.bodyMedium) },
                 leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (search.isNotEmpty()) {

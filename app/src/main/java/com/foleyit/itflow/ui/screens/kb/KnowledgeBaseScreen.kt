@@ -65,7 +65,7 @@ fun KnowledgeBaseScreen(navController: NavController) {
                 OutlinedTextField(
                     value = search,
                     onValueChange = { search = it; list.onSearchChanged(it) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     placeholder = { Text("Search articles…", style = MaterialTheme.typography.bodyMedium) },
                     leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
                     trailingIcon = {

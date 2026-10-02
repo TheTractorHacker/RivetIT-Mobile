@@ -42,7 +42,7 @@ fun ContractsScreen(navController: NavController) {
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it; list.onSearchChanged(it) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).height(48.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).heightIn(min = 48.dp),
                 placeholder = { Text("Search contracts…", style = MaterialTheme.typography.bodyMedium) },
                 leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
                 trailingIcon = {
