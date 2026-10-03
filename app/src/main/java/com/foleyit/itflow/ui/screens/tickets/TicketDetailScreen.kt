@@ -36,8 +36,10 @@ import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadingScreen
 import com.foleyit.itflow.ui.components.PriorityBadge
 import com.foleyit.itflow.ui.util.userMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 fun stripHtml(html: String?): String {
     if (html.isNullOrBlank()) return ""
@@ -119,17 +121,13 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
             title = "New Worksheet",
             onDismiss = { showAddWorksheet = false },
             onCreate = { templateId ->
-                scope.launch {
-                    runCatching {
-                        ApiClient.service().createWorksheet(id, CreateWorksheetRequest(templateId, 0))
-                    }.onSuccess { ws ->
-                        load()
-                        ws["id"]?.let { wsId -> navController.navigate(Screen.FillWorksheet.go(wsId)) }
-                    }.onFailure {
-                        snackbar.showSnackbar("Failed to create worksheet: ${userMessage(it)}")
-                    }
-                }
+                ApiClient.service().createWorksheet(id, CreateWorksheetRequest(templateId, 0))["id"]
+                    ?.takeIf { it > 0 } ?: throw MissingFormIdException()
+            },
+            onCreated = { wsId ->
                 showAddWorksheet = false
+                load()
+                navController.navigate(Screen.FillWorksheet.go(wsId))
             }
         )
     }
@@ -138,17 +136,13 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
         OuttakeSheet(
             onDismiss = { showAddOuttake = false },
             onCreate = {
-                scope.launch {
-                    runCatching {
-                        ApiClient.service().createOuttake(id, CreateWorksheetRequest())
-                    }.onSuccess { form ->
-                        load()
-                        form["id"]?.let { formId -> navController.navigate(Screen.OuttakeSign.go(formId)) }
-                    }.onFailure {
-                        snackbar.showSnackbar("Failed to create outtake form: ${userMessage(it)}")
-                    }
-                }
+                ApiClient.service().createOuttake(id, CreateWorksheetRequest())["id"]
+                    ?.takeIf { it > 0 } ?: throw MissingFormIdException()
+            },
+            onCreated = { formId ->
                 showAddOuttake = false
+                load()
+                navController.navigate(Screen.OuttakeSign.go(formId))
             }
         )
     }
@@ -1164,8 +1158,11 @@ private fun QtyStepper(value: Int, onChange: (Int) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: suspend () -> Int, onCreated: (Int) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var submitting by remember { mutableStateOf(false) }
+    var submitError by remember { mutableStateOf<String?>(null) }
+    ModalBottomSheet(onDismissRequest = { if (!submitting) onDismiss() }) {
         Column(
             Modifier.padding(horizontal = 24.dp).navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -1191,13 +1188,31 @@ private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onCreate, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Outlined.Draw, null, Modifier.size(18.dp))
+            submitError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            Button(onClick = {
+                if (submitting) return@Button
+                submitting = true
+                submitError = null
+                scope.launch {
+                    try {
+                        val formId = onCreate()
+                        onCreated(formId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        submitError = createFormError("outtake form", e)
+                    } finally {
+                        submitting = false
+                    }
+                }
+            }, enabled = !submitting, modifier = Modifier.fillMaxWidth()) {
+                if (submitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.Draw, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Create & Sign")
+                Text(if (submitting) "Creating…" else "Create & Sign")
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !submitting, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -1208,45 +1223,89 @@ private fun OuttakeSheet(onDismiss: () -> Unit, onCreate: () -> Unit) {
 private fun SelectTemplateSheet(
     title: String,
     onDismiss: () -> Unit,
-    onCreate: (templateId: Int) -> Unit
+    onCreate: suspend (templateId: Int) -> Int,
+    onCreated: (Int) -> Unit
 ) {
-    var templates by remember { mutableStateOf<List<WorksheetTemplate>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+    var templates by remember { mutableStateOf<Result<List<WorksheetTemplate>>?>(null) }
+    var loadAttempt by remember { mutableIntStateOf(0) }
+    var submitting by remember { mutableStateOf(false) }
+    var submittingTemplateId by remember { mutableStateOf<Int?>(null) }
+    var submitError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        templates = runCatching { ApiClient.service().getWorksheetTemplates() }.getOrDefault(emptyList())
+    LaunchedEffect(loadAttempt) {
+        templates = runCatching { ApiClient.service().getWorksheetTemplates() }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = { if (!submitting) onDismiss() }) {
+        Column(Modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState()).navigationBarsPadding()) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
-            if (templates.isEmpty()) {
-                Text("No worksheet templates available.", color = MaterialTheme.colorScheme.outline,
-                    style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text("Select Template", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                templates.forEach { t ->
-                    Surface(
-                        onClick = { onCreate(t.id) },
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(t.name, fontWeight = FontWeight.Medium)
-                            t.description?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            when {
+                templates == null -> CircularProgressIndicator(Modifier.size(24.dp))
+                templates!!.isFailure -> {
+                    Text("Could not load worksheet templates: ${userMessage(templates!!.exceptionOrNull()!!)}",
+                        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { templates = null; loadAttempt++ }) { Text("Retry") }
+                }
+                templates!!.getOrThrow().isEmpty() -> Text("No worksheet templates available.",
+                    color = MaterialTheme.colorScheme.outline, style = MaterialTheme.typography.bodySmall)
+                else -> {
+                    Text("Select Template", style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    templates!!.getOrThrow().forEach { t ->
+                        Surface(
+                            onClick = {
+                                if (submitting) return@Surface
+                                submitting = true
+                                submittingTemplateId = t.id
+                                submitError = null
+                                scope.launch {
+                                    try {
+                                        val worksheetId = onCreate(t.id)
+                                        onCreated(worksheetId)
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (e: Exception) {
+                                        submitError = createFormError("worksheet", e)
+                                    } finally {
+                                        submitting = false
+                                        submittingTemplateId = null
+                                    }
+                                }
+                            },
+                            enabled = !submitting,
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text(t.name, fontWeight = FontWeight.Medium)
+                                t.description?.takeIf { it.isNotBlank() }?.let {
+                                    Text(it, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (submittingTemplateId == t.id) {
+                                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
+                                }
                             }
                         }
                     }
                 }
             }
+            submitError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !submitting, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+private class MissingFormIdException : IllegalStateException()
+
+private fun createFormError(name: String, error: Exception): String = if (error is IOException || error is MissingFormIdException) {
+    "Could not confirm the $name. Check the ticket before trying again."
+} else {
+    "Could not create $name: ${userMessage(error)}"
 }
