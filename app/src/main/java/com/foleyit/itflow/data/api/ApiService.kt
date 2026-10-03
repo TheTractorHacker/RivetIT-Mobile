@@ -241,6 +241,7 @@ interface ApiService {
     ): CredentialDetail
 
     // Notifications
+    @Headers("Cache-Control: no-store")
     @GET("notifications")
     suspend fun getNotifications(@Query("page") page: Int = 1): NotificationsResponse
 

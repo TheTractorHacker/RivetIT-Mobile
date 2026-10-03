@@ -261,7 +261,9 @@ fun MainScreen(
             composable(Screen.CredDetail.route) {
                 CredentialDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
-            composable(Screen.Notifications.route) { NotificationsScreen() }
+            composable(Screen.Notifications.route) {
+                NotificationsScreen(onUnreadChanged = { hasUnreadNotifications = it })
+            }
             composable(Screen.Alerts.route) { AlertsScreen(navController) }
             composable(Screen.Profile.route) { ProfileScreen(navController, prefs, onChangeServer, onLoggedOut) }
             composable(Screen.KnowledgeBase.route) { KnowledgeBaseScreen(navController) }

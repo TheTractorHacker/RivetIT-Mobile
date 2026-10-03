@@ -20,63 +20,106 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen() {
+fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}) {
     var state by remember { mutableStateOf<Result<com.foleyit.itflow.data.api.NotificationsResponse>?>(null) }
+    var pendingId by remember { mutableStateOf<Int?>(null) }
+    var markingAll by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    fun load() { scope.launch { state = runCatching { ApiClient.service().getNotifications() } } }
+    fun load() {
+        scope.launch {
+            state = runCatching { ApiClient.service().getNotifications() }
+            state?.getOrNull()?.let { onUnreadChanged(it.total > 0) }
+        }
+    }
     LaunchedEffect(Unit) { load() }
 
-    Scaffold(topBar = {
+    fun markRead(id: Int) {
+        if (pendingId != null || markingAll) return
+        pendingId = id
+        scope.launch {
+            val result = runCatching { ApiClient.service().markRead(id) }
+            if (result.isSuccess) {
+                state = state?.map { response ->
+                    response.copy(data = response.data.filterNot { it.id == id }, total = (response.total - 1).coerceAtLeast(0))
+                }
+                state?.getOrNull()?.let { onUnreadChanged(it.total > 0) }
+            }
+            pendingId = null
+            if (result.isFailure) snackbar.showSnackbar("Could not mark notification as read. Try again.")
+        }
+    }
+
+    fun markAllRead() {
+        if (pendingId != null || markingAll) return
+        markingAll = true
+        scope.launch {
+            val result = runCatching { ApiClient.service().markAllRead() }
+            if (result.isSuccess) {
+                state = state?.map { it.copy(data = emptyList(), total = 0) }
+                onUnreadChanged(false)
+            }
+            markingAll = false
+            if (result.isFailure) snackbar.showSnackbar("Could not mark all notifications as read. Try again.")
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }, topBar = {
         TopAppBar(
             title = { Text("Notifications") },
             actions = {
                 state?.getOrNull()?.data?.takeIf { it.isNotEmpty() }?.let {
-                    TextButton(onClick = { scope.launch { runCatching { ApiClient.service().markAllRead() }; load() } }) { Text("Mark all read") }
+                    TextButton(onClick = ::markAllRead, enabled = pendingId == null && !markingAll) {
+                        if (markingAll) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        else Text("Mark all read")
+                    }
                 }
             }
         )
     }) { padding ->
-        when {
-            state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
-            else -> {
-                val notifs = state!!.getOrThrow().data
-                if (notifs.isEmpty()) EmptyScreen("No new notifications", Icons.Outlined.NotificationsNone)
-                else LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(notifs, key = { it.id }) { n ->
-                        val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = {
-                            if (it == SwipeToDismissBoxValue.EndToStart) {
-                                scope.launch { runCatching { ApiClient.service().markRead(n.id) }; load() }
-                            }
-                            true
-                        })
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            backgroundContent = {
-                                Surface(
-                                    modifier = Modifier.fillMaxSize(),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = MaterialTheme.shapes.large
-                                ) {
-                                    Box(Modifier.fillMaxSize().padding(end = 24.dp), contentAlignment = Alignment.CenterEnd) {
-                                        Icon(
-                                            Icons.Outlined.Check,
-                                            contentDescription = "Mark read",
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            when {
+                state == null -> LoadingScreen()
+                state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+                else -> {
+                    val notifs = state!!.getOrThrow().data
+                    if (notifs.isEmpty()) EmptyScreen("No new notifications", Icons.Outlined.NotificationsNone)
+                    else LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(notifs, key = { it.id }) { n ->
+                            val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = {
+                                if (it == SwipeToDismissBoxValue.EndToStart) markRead(n.id)
+                                // Keep the card until the server confirms the write.
+                                false
+                            })
+                            SwipeToDismissBox(
+                                modifier = Modifier.animateItem(),
+                                state = dismissState,
+                                enableDismissFromStartToEnd = false,
+                                enableDismissFromEndToStart = pendingId == null && !markingAll,
+                                backgroundContent = {
+                                    Surface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = MaterialTheme.shapes.large
+                                    ) {
+                                        Box(Modifier.fillMaxSize().padding(end = 24.dp), contentAlignment = Alignment.CenterEnd) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                contentDescription = "Mark read",
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
                                     }
+                                },
+                                content = {
+                                    NotifItem(n, pending = pendingId == n.id, enabled = pendingId == null && !markingAll) { markRead(n.id) }
                                 }
-                            },
-                            content = {
-                                NotifItem(n) {
-                                    scope.launch { runCatching { ApiClient.service().markRead(n.id) }; load() }
-                                }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -85,7 +128,7 @@ fun NotificationsScreen() {
 }
 
 @Composable
-private fun NotifItem(n: Notification, onMarkRead: () -> Unit) {
+private fun NotifItem(n: Notification, pending: Boolean, enabled: Boolean, onMarkRead: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -110,8 +153,9 @@ private fun NotifItem(n: Notification, onMarkRead: () -> Unit) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onMarkRead) {
-                Icon(Icons.Outlined.CheckCircle, contentDescription = "Mark read", tint = MaterialTheme.colorScheme.primary)
+            IconButton(onClick = onMarkRead, enabled = enabled) {
+                if (pending) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.CheckCircle, contentDescription = "Mark read", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }

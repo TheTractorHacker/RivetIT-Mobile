@@ -23,7 +23,7 @@ State markers: `L` loading, `E` empty, `R` retry/error, `—` no explicit marker
 | `credentials` | `app/src/main/java/com/foleyit/itflow/ui/screens/credentials/CredentialsScreen.kt` | `getCredentials` | LER | Touched; device QA pending |
 | `credentials/{id}` | `app/src/main/java/com/foleyit/itflow/ui/screens/credentials/CredentialDetailScreen.kt` | `getCredential`, `passkeyBegin`, `registerBiometricKey` | LR | Review and device QA pending |
 | `quotes`, `invoices`, `expenses` | Removed in this pass | Removed RivetIT API endpoints | — | Retired; no longer offered in drawer or deep links |
-| `notifications` | `app/src/main/java/com/foleyit/itflow/ui/screens/notifications/NotificationsScreen.kt` | `getNotifications`, `markAllRead`, `markRead` | LER | Review and device QA pending |
+| `notifications` | `app/src/main/java/com/foleyit/itflow/ui/screens/notifications/NotificationsScreen.kt` | `getNotifications`, `markAllRead`, `markRead` | LER | Read actions now wait for server success, show progress/errors, and animate list removal; device QA pending |
 | `appointments` | `app/src/main/java/com/foleyit/itflow/ui/screens/appointments/AppointmentsScreen.kt` | `createAppointment`, `getAppointments`, `getTickets` | LER | Review and device QA pending |
 | `worksheets/{id}/fill` | `app/src/main/java/com/foleyit/itflow/ui/screens/worksheets/FillWorksheetScreen.kt` | `getWorksheet`, `saveResponses` | LR | Review and device QA pending |
 | `outtakes/{id}/sign` | `app/src/main/java/com/foleyit/itflow/ui/screens/worksheets/OuttakeSignScreen.kt` | `getOuttake`, `signOuttake` | LR | Review and device QA pending |
@@ -57,6 +57,8 @@ The reports screen had a doubled top safe-area inset. [Before](qa/issue-9/report
 At 150% Android font scale, the fixed-height search field on the ticket list clipped its prompt. [Before](qa/issue-9/tickets-large-before.png) and [after](qa/issue-9/tickets-large-after.png) screenshots show the corrected field. Asset, project, contract, and knowledge-base search fields had the same fixed-height pattern and now grow with text. Their full screen audits remain pending.
 
 The [tablet dashboard](qa/issue-9/dashboard-tablet-light.png) was checked at a 1600×2560 emulator viewport. Its two-column metrics and ticket queue remained legible without overlap. This verifies one dashboard state, not the other tablet routes.
+
+The notification list previously allowed a swipe to disappear before the mark-read request finished and silently ignored write failures. It now keeps the card visible until success, blocks duplicate actions, reports failures with a retryable card, and updates the shell's unread dot. The notifications GET bypasses the disk cache so a subsequent visit reflects server state. No emulator was attached for a visual or network-failure check of this change.
 
 This is a partial audit. No restricted-role, comprehensive tablet, TalkBack, rotation, reduced-motion, deep-link, write-path, or representative-device performance result is claimed here.
 
