@@ -33,8 +33,10 @@ import com.foleyit.itflow.ui.components.pressScale
 import com.foleyit.itflow.ui.theme.forPriority
 import com.foleyit.itflow.ui.theme.statusColors
 import com.foleyit.itflow.ui.navigation.Screen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -60,19 +62,14 @@ fun AppointmentsScreen(navController: NavController) {
         AddAppointmentSheet(
             onDismiss = { showAdd = false },
             onCreate = { ticketId, start, end, onsite, notes ->
-                scope.launch {
-                    runCatching {
-                        ApiClient.service().createAppointment(
-                            CreateAppointmentRequest(ticketId, start, end, onsite, notes)
-                        )
-                    }.onSuccess {
-                        load()
-                        snackbar.showSnackbar("Appointment added")
-                    }.onFailure {
-                        snackbar.showSnackbar("Failed to add appointment: ${userMessage(it)}")
-                    }
-                }
+                ApiClient.service().createAppointment(
+                    CreateAppointmentRequest(ticketId, start, end, onsite, notes)
+                )
+            },
+            onCreated = {
                 showAdd = false
+                load()
+                scope.launch { snackbar.showSnackbar("Appointment added") }
             }
         )
     }
@@ -104,7 +101,7 @@ fun AppointmentsScreen(navController: NavController) {
 
         when {
             state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+            state!!.isFailure -> ErrorScreen(userMessage(state!!.exceptionOrNull()!!), onRetry = ::load)
             else -> {
                 val appts = state!!.getOrThrow()
                 if (appts.isEmpty()) {
@@ -266,15 +263,19 @@ private val displayTimeFormat = SimpleDateFormat("h:mm a", Locale.US)
 @Composable
 private fun AddAppointmentSheet(
     onDismiss: () -> Unit,
-    onCreate: (ticketId: Int, start: String, end: String?, onsite: Boolean, notes: String) -> Unit
+    onCreate: suspend (ticketId: Int, start: String, end: String?, onsite: Boolean, notes: String) -> Unit,
+    onCreated: () -> Unit
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var ticketSearch by remember { mutableStateOf("") }
     var tickets by remember { mutableStateOf<List<TicketSummary>>(emptyList()) }
     var selectedTicket by remember { mutableStateOf<TicketSummary?>(null) }
     var onsite by remember { mutableStateOf(true) }
     var notes by remember { mutableStateOf("") }
     var hasEnd by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submitError by remember { mutableStateOf<String?>(null) }
 
     val startCal = remember { Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 1); set(Calendar.MINUTE, 0) } }
     var startMillis by remember { mutableLongStateOf(startCal.timeInMillis) }
@@ -300,7 +301,7 @@ private fun AddAppointmentSheet(
         }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = { if (!isSubmitting) onDismiss() }) {
         Column(
             Modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState()).navigationBarsPadding()
         ) {
@@ -311,6 +312,7 @@ private fun AddAppointmentSheet(
                 OutlinedTextField(
                     value = ticketSearch,
                     onValueChange = { ticketSearch = it },
+                    enabled = !isSubmitting,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Ticket") },
                     placeholder = { Text("Search open tickets…") },
@@ -322,6 +324,7 @@ private fun AddAppointmentSheet(
                 tickets.take(8).forEach { t ->
                     Surface(
                         onClick = { selectedTicket = t },
+                        enabled = !isSubmitting,
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
@@ -346,7 +349,7 @@ private fun AddAppointmentSheet(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
-                        IconButton(onClick = { selectedTicket = null; ticketSearch = "" }) {
+                        IconButton(onClick = { selectedTicket = null; ticketSearch = "" }, enabled = !isSubmitting) {
                             Icon(Icons.Outlined.Close, "Change ticket")
                         }
                     }
@@ -358,7 +361,8 @@ private fun AddAppointmentSheet(
             Spacer(Modifier.height(6.dp))
             OutlinedButton(
                 onClick = { pickDateTime(startMillis) { picked -> startMillis = picked; if (endMillis <= startMillis) endMillis = startMillis + 60 * 60 * 1000 } },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isSubmitting
             ) {
                 Icon(Icons.Outlined.Schedule, null, Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
@@ -367,23 +371,28 @@ private fun AddAppointmentSheet(
 
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = hasEnd, onCheckedChange = { hasEnd = it })
+                Checkbox(checked = hasEnd, onCheckedChange = { hasEnd = it }, enabled = !isSubmitting)
                 Text("Set an end time")
             }
             if (hasEnd) {
                 OutlinedButton(
                     onClick = { pickDateTime(endMillis) { picked -> endMillis = picked } },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSubmitting
                 ) {
                     Icon(Icons.Outlined.Schedule, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("${displayDateFormat.format(endMillis)} · ${displayTimeFormat.format(endMillis)}")
                 }
             }
+            if (hasEnd && endMillis <= startMillis) {
+                Text("End time must be after start", color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+            }
 
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = onsite, onCheckedChange = { onsite = it })
+                Switch(checked = onsite, onCheckedChange = { onsite = it }, enabled = !isSubmitting)
                 Spacer(Modifier.width(8.dp))
                 Text(if (onsite) "Onsite visit" else "Remote")
             }
@@ -392,27 +401,58 @@ private fun AddAppointmentSheet(
             OutlinedTextField(
                 value = notes, onValueChange = { notes = it },
                 label = { Text("Notes") },
-                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4
+                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4,
+                enabled = !isSubmitting
             )
 
             Spacer(Modifier.height(16.dp))
+            submitError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss, enabled = !isSubmitting) { Text("Cancel") }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
                         selectedTicket?.let { t ->
-                            onCreate(
-                                t.id,
-                                sqlDateTimeFormat.format(startMillis),
-                                if (hasEnd) sqlDateTimeFormat.format(endMillis) else null,
-                                onsite,
-                                notes
-                            )
+                            if (isSubmitting) return@let
+                            isSubmitting = true
+                            submitError = null
+                            scope.launch {
+                                var created = false
+                                try {
+                                    onCreate(
+                                        t.id,
+                                        sqlDateTimeFormat.format(startMillis),
+                                        if (hasEnd) sqlDateTimeFormat.format(endMillis) else null,
+                                        onsite,
+                                        notes
+                                    )
+                                    created = true
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    submitError = if (e is IOException) {
+                                        "Could not confirm the appointment. Check the list before trying again."
+                                    } else {
+                                        "Could not add appointment: ${userMessage(e)}"
+                                    }
+                                } finally {
+                                    isSubmitting = false
+                                }
+                                if (created) onCreated()
+                            }
                         }
                     },
-                    enabled = selectedTicket != null
-                ) { Text("Create") }
+                    enabled = selectedTicket != null && !isSubmitting && (!hasEnd || endMillis > startMillis)
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Creating…")
+                    } else Text("Create")
+                }
             }
             Spacer(Modifier.height(8.dp))
         }
