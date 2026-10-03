@@ -3,6 +3,8 @@ package com.foleyit.itflow.ui.screens.tickets
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +32,8 @@ import com.foleyit.itflow.ui.components.SectionLabel
 import com.foleyit.itflow.ui.theme.forPriority
 import com.foleyit.itflow.ui.theme.statusColors
 import com.foleyit.itflow.ui.util.userMessage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,9 +44,12 @@ fun CreateTicketScreen(navController: NavController) {
     var priority by rememberSaveable { mutableStateOf("low") }
     var selectedClientId by rememberSaveable { mutableStateOf<Int?>(null) }
     var selectedClientName by rememberSaveable { mutableStateOf("") }
-    var clients by remember { mutableStateOf<ClientsResponse?>(null) }
+    var clients by remember { mutableStateOf<Result<ClientsResponse>?>(null) }
+    var clientSearch by remember { mutableStateOf("") }
+    var clientLoadAttempt by remember { mutableIntStateOf(0) }
     var showClientPicker by remember { mutableStateOf(false) }
-    var categories by remember { mutableStateOf<List<TicketCategory>>(emptyList()) }
+    var categories by remember { mutableStateOf<Result<List<TicketCategory>>?>(null) }
+    var categoryLoadAttempt by remember { mutableIntStateOf(0) }
     var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -73,10 +80,27 @@ fun CreateTicketScreen(navController: NavController) {
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(showClientPicker, clientSearch, clientLoadAttempt) {
+        if (!showClientPicker) return@LaunchedEffect
         // The API retains client_id; the app calls these records departments.
-        clients = runCatching { ApiClient.service().getClients(search = "", page = 1) }.getOrNull()
-        categories = runCatching { ApiClient.service().getTicketCategories() }.getOrDefault(emptyList())
+        clients = null
+        if (clientSearch.isNotBlank()) delay(250)
+        clients = try {
+            Result.success(ApiClient.service().getClients(search = clientSearch.trim(), page = 1))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    LaunchedEffect(categoryLoadAttempt) {
+        categories = try {
+            Result.success(ApiClient.service().getTicketCategories())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     fun submit() {
@@ -102,10 +126,20 @@ fun CreateTicketScreen(navController: NavController) {
     }
 
     if (showClientPicker) {
-        ModalBottomSheet(onDismissRequest = { showClientPicker = false }) {
-            Column(Modifier.padding(16.dp).navigationBarsPadding()) {
+        ModalBottomSheet(
+            onDismissRequest = { showClientPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(Modifier.heightIn(max = 600.dp).padding(16.dp).navigationBarsPadding()) {
                 Text("Select Department", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = clientSearch, onValueChange = { clientSearch = it },
+                    label = { Text("Search departments") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
                 Spacer(Modifier.height(8.dp))
                 Surface(onClick = { selectedClientId = null; selectedClientName = ""; showClientPicker = false },
                     modifier = Modifier.fillMaxWidth()) {
@@ -113,21 +147,44 @@ fun CreateTicketScreen(navController: NavController) {
                         color = MaterialTheme.colorScheme.outline)
                 }
                 HorizontalDivider()
-                clients?.data?.forEach { c ->
-                    Surface(onClick = {
-                        selectedClientId = c.id; selectedClientName = c.name; showClientPicker = false
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Text(c.name, Modifier.padding(16.dp))
+                when {
+                    clients == null -> CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp))
+                    clients!!.isFailure -> {
+                        Text("Could not load departments: ${userMessage(clients!!.exceptionOrNull()!!)}",
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { clients = null; clientLoadAttempt++ }) { Text("Retry") }
                     }
-                    HorizontalDivider()
+                    else -> {
+                        val response = clients!!.getOrThrow()
+                        if (response.data.isEmpty()) Text("No departments found", Modifier.padding(16.dp))
+                        LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                            items(response.data, key = { it.id }) { c ->
+                                Surface(onClick = {
+                                    selectedClientId = c.id; selectedClientName = c.name; showClientPicker = false
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(c.name, Modifier.padding(16.dp))
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                        if (response.total > response.data.size) {
+                            Text("Search by name to find more departments.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
     }
 
     if (showCategoryPicker) {
-        ModalBottomSheet(onDismissRequest = { showCategoryPicker = false }) {
-            Column(Modifier.padding(16.dp).navigationBarsPadding()) {
+        ModalBottomSheet(
+            onDismissRequest = { showCategoryPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState())
+                .padding(16.dp).navigationBarsPadding()) {
                 Text("Select Category", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
@@ -137,13 +194,22 @@ fun CreateTicketScreen(navController: NavController) {
                         color = MaterialTheme.colorScheme.outline)
                 }
                 HorizontalDivider()
-                categories.forEach { cat ->
-                    Surface(onClick = {
-                        selectedCategoryId = cat.id; showCategoryPicker = false
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Text(cat.name, Modifier.padding(16.dp))
+                when {
+                    categories == null -> CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp))
+                    categories!!.isFailure -> {
+                        Text("Could not load categories: ${userMessage(categories!!.exceptionOrNull()!!)}",
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { categories = null; categoryLoadAttempt++ }) { Text("Retry") }
                     }
-                    HorizontalDivider()
+                    categories!!.getOrThrow().isEmpty() -> Text("No categories available", Modifier.padding(16.dp))
+                    else -> categories!!.getOrThrow().forEach { cat ->
+                        Surface(onClick = {
+                            selectedCategoryId = cat.id; showCategoryPicker = false
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(cat.name, Modifier.padding(16.dp))
+                        }
+                        HorizontalDivider()
+                    }
                 }
             }
         }
@@ -273,8 +339,8 @@ fun CreateTicketScreen(navController: NavController) {
                             }
                         }
                     }
-                    if (categories.isNotEmpty()) {
-                        val selectedCategoryName = categories.firstOrNull { it.id == selectedCategoryId }?.name
+                    if (categories?.getOrNull()?.isNotEmpty() == true || categories == null || categories?.isFailure == true) {
+                        val selectedCategoryName = categories?.getOrNull()?.firstOrNull { it.id == selectedCategoryId }?.name
                         Column(
                             Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
