@@ -55,6 +55,18 @@ object ApiClient {
         try { _httpCache?.evictAll() } catch (_: Exception) { /* A failed eviction must not block sign-out. */ }
     }
 
+    /** Drop ticket GETs after creating a ticket so returning to the list shows it immediately. */
+    fun invalidateTicketResponses() {
+        val ticketUrl = "$_serverUrl/api/v1/tickets"
+        try {
+            val urls = _httpCache?.urls() ?: return
+            while (urls.hasNext()) {
+                val url = urls.next().substringBefore('?')
+                if (url == ticketUrl || url.startsWith("$ticketUrl/")) urls.remove()
+            }
+        } catch (_: Exception) { /* Cache cleanup must not turn a successful write into an error. */ }
+    }
+
     private fun isOnline(): Boolean {
         val ctx = _appContext ?: return true
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

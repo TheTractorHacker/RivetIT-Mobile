@@ -29,6 +29,7 @@ import com.foleyit.itflow.data.api.ClientsResponse
 import com.foleyit.itflow.data.api.CreateTicketRequest
 import com.foleyit.itflow.data.api.TicketCategory
 import com.foleyit.itflow.ui.components.SectionLabel
+import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.theme.forPriority
 import com.foleyit.itflow.ui.theme.statusColors
 import com.foleyit.itflow.ui.util.userMessage
@@ -109,7 +110,7 @@ fun CreateTicketScreen(navController: NavController) {
         saving = true; error = null
         scope.launch {
             try {
-                ApiClient.service().createTicket(
+                val created = ApiClient.service().createTicket(
                     CreateTicketRequest(
                         subject = subject.trim(),
                         details = details.trim(),
@@ -118,7 +119,12 @@ fun CreateTicketScreen(navController: NavController) {
                         categoryId = selectedCategoryId
                     )
                 )
-                navController.popBackStack()
+                val ticketId = created["id"]?.takeIf { it > 0 }
+                    ?: throw IllegalStateException("Server did not return a ticket ID")
+                ApiClient.invalidateTicketResponses()
+                navController.navigate(Screen.TicketDetail.go(ticketId)) {
+                    popUpTo(Screen.CreateTicket.route) { inclusive = true }
+                }
             } catch (e: Exception) {
                 error = "Could not confirm ticket creation. Check Tickets before trying again: ${userMessage(e)}"
             } finally { saving = false }
