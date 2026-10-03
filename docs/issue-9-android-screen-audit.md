@@ -46,7 +46,7 @@ State markers: `L` loading, `E` empty, `R` retry/error, `—` no explicit marker
 | `profile` | `app/src/main/java/com/foleyit/itflow/ui/screens/profile/ProfileScreen.kt` | `getProfile`, `logout`, `registerFcmToken`, `updateProfile` | — | Review and device QA pending |
 | `kb` | `app/src/main/java/com/foleyit/itflow/ui/screens/kb/KnowledgeBaseScreen.kt` | `getKbArticles`, `getKbCategories` | LER | Touched; device QA pending |
 | `kb/{id}` | `app/src/main/java/com/foleyit/itflow/ui/screens/kb/KbArticleDetailScreen.kt` | `getKbArticle` | LR | Review and device QA pending |
-| `alerts` | `app/src/main/java/com/foleyit/itflow/ui/screens/alerts/AlertsScreen.kt` | `actOnAlert`, `getAlerts` | LER | Tablet filter/error/retry UI checked; data and write-path QA pending |
+| `alerts` | `app/src/main/java/com/foleyit/itflow/ui/screens/alerts/AlertsScreen.kt` | `actOnAlert`, `getAlerts` | LER | Tablet mock-data, write-failure, retry, and status tabs checked; backend permissions/lifecycle pending |
 
 ## Emulator findings (2026-10-02)
 
@@ -60,7 +60,7 @@ The [tablet dashboard](qa/issue-9/dashboard-tablet-light.png) was checked at a 1
 
 The notification list previously allowed a swipe to disappear before the mark-read request finished and silently ignored write failures. It now keeps the card visible until success, blocks duplicate actions, reports failures with a retryable card, and updates the shell's unread dot. The notifications GET bypasses the disk cache so a subsequent visit reflects server state. No emulator was attached for a visual or network-failure check of this change.
 
-The Alerts page also ignored failed acknowledge/resolve writes. It now shows pending actions and errors, updates an alert only after a successful response, keeps filter results fresh after writes, and lets action buttons wrap on narrow or large-text layouts. On the 1600×2560 Android 36 emulator, the [filters and network-error retry state](qa/issue-9/alerts-tablet-error.png) rendered when the earlier disposable test API was offline. No alert-data or write-path result is claimed; those still need a live disposable test server. The emulator required temporary KVM access for this account, removed after the check.
+The Alerts page also ignored failed acknowledge/resolve writes. It now shows pending actions and errors, updates an alert only after a successful response, keeps filter results fresh after writes, and lets action buttons wrap on narrow or large-text layouts. On the 1600×2560 Android 36 emulator, the [filters and network-error retry state](qa/issue-9/alerts-tablet-error.png) rendered when the earlier disposable test API was offline. A temporary HTTPS mock using that test certificate then supplied [two fictional alerts](qa/issue-9/alerts-tablet-data.png). Its first backup Resolve returned HTTP 503: the [error appeared and the alert remained in New](qa/issue-9/alerts-tablet-write-error.png). A second Resolve returned 200, removed the alert from New, and showed it in Resolved. Acknowledge returned 200 and moved the RMM alert from New to Acked. These results verify the client interaction against a mock, not backend permissions or real alert integrations. Rotation, process recreation, back-navigation filter persistence, phone size, and live backend writes remain unverified. Temporary KVM access was removed after the check.
 
 This is a partial audit. No restricted-role, comprehensive tablet, TalkBack, rotation, reduced-motion, deep-link, write-path, or representative-device performance result is claimed here.
 
