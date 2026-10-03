@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,108 +25,151 @@ import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.theme.forAlertSeverity
 import com.foleyit.itflow.ui.theme.forAlertStatus
 import com.foleyit.itflow.ui.theme.statusColors
+import com.foleyit.itflow.ui.util.userMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val STATUS_TABS = listOf("new" to "New", "acknowledged" to "Acked", "resolved" to "Resolved", "all" to "All")
 
 @Composable
 fun AlertsScreen(navController: NavController) {
-    var status by remember { mutableStateOf("new") }
+    var status by rememberSaveable { mutableStateOf("new") }
     var state by remember { mutableStateOf<Result<List<AlertItem>>?>(null) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    var pendingKey by remember { mutableStateOf<String?>(null) }
+    var pendingAction by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
 
-    fun load() {
-        scope.launch {
-            state = runCatching { ApiClient.service().getAlerts(status = status).data }
+    LaunchedEffect(status, refreshKey) {
+        state = null
+        try {
+            state = Result.success(ApiClient.service().getAlerts(status = status).data)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            state = Result.failure(e)
         }
     }
-    LaunchedEffect(status) { load() }
 
     fun act(alert: AlertItem, action: String) {
+        if (pendingKey != null) return
+        pendingKey = "${alert.source}:${alert.id}"
+        pendingAction = action
         scope.launch {
-            runCatching { ApiClient.service().actOnAlert(AlertActionRequest(alert.source, alert.id, action)) }
-            load()
+            var errorMessage: String? = null
+            try {
+                ApiClient.service().actOnAlert(AlertActionRequest(alert.source, alert.id, action))
+                val nextStatus = if (action == "acknowledge") "acknowledged" else "resolved"
+                state = state?.map { alerts ->
+                    if (status == "all" || status == nextStatus) {
+                        alerts.map { item ->
+                            if (item.source == alert.source && item.id == alert.id) item.copy(status = nextStatus) else item
+                        }
+                    } else {
+                        alerts.filterNot { it.source == alert.source && it.id == alert.id }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage = "Could not ${if (action == "acknowledge") "acknowledge" else "resolve"} alert: ${userMessage(e)}"
+            } finally {
+                pendingKey = null
+                pendingAction = null
+            }
+            errorMessage?.let { snackbar.showSnackbar(it) }
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        // Segmented pill control for New/Acked/Resolved/All — matches the Tickets screen's
-        // segmented status control rather than a stock ScrollableTabRow.
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.extraLarge,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        ) {
-            Row(modifier = Modifier.padding(4.dp)) {
-                STATUS_TABS.forEach { (key, label) ->
-                    val selected = status == key
-                    Surface(
-                        selected = selected,
-                        onClick = { status = key },
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            // Segmented pill control for New/Acked/Resolved/All — matches the Tickets screen's
+            // segmented status control rather than a stock ScrollableTabRow.
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.extraLarge,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(modifier = Modifier.padding(4.dp)) {
+                    STATUS_TABS.forEach { (key, label) ->
+                        val selected = status == key
+                        Surface(
+                            selected = selected,
+                            onClick = { status = key },
+                            enabled = pendingKey == null,
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
+                            Box(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        when {
-            state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
-            else -> {
-                val alerts = state!!.getOrThrow()
-                if (alerts.isEmpty()) {
-                    EmptyScreen("No alerts here", Icons.Outlined.CheckCircle)
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(alerts, key = { it.source + it.id }) { alert ->
-                            AlertCard(
-                                alert = alert,
-                                onAcknowledge = { act(alert, "acknowledge") },
-                                onResolve = { act(alert, "resolve") },
-                                onViewTicket = {
-                                    alert.ticketId?.let { navController.navigate(Screen.TicketDetail.go(it)) }
-                                }
-                            )
+            when {
+                state == null -> LoadingScreen()
+                state!!.isFailure -> ErrorScreen(userMessage(state!!.exceptionOrNull()!!), onRetry = { refreshKey++ })
+                else -> {
+                    val alerts = state!!.getOrThrow()
+                    if (alerts.isEmpty()) {
+                        EmptyScreen("No alerts here", Icons.Outlined.CheckCircle)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(alerts, key = { "${it.source}:${it.id}" }) { alert ->
+                                AlertCard(
+                                    modifier = Modifier.animateItem(),
+                                    alert = alert,
+                                    enabled = pendingKey == null,
+                                    pendingAction = if (pendingKey == "${alert.source}:${alert.id}") pendingAction else null,
+                                    onAcknowledge = { act(alert, "acknowledge") },
+                                    onResolve = { act(alert, "resolve") },
+                                    onViewTicket = {
+                                        alert.ticketId?.let { navController.navigate(Screen.TicketDetail.go(it)) }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
 @Composable
 private fun AlertCard(
+    modifier: Modifier,
     alert: AlertItem,
+    enabled: Boolean,
+    pendingAction: String?,
     onAcknowledge: () -> Unit,
     onResolve: () -> Unit,
     onViewTicket: () -> Unit
 ) {
     val severityColor = MaterialTheme.statusColors.forAlertSeverity(alert.severity)
     val statusColor = MaterialTheme.statusColors.forAlertStatus(alert.status)
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    Card(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
         Row(modifier = Modifier.padding(16.dp)) {
             Surface(shape = MaterialTheme.shapes.extraLarge, color = severityColor.copy(alpha = 0.15f), modifier = Modifier.size(40.dp)) {
                 Box(contentAlignment = Alignment.Center) {
@@ -158,15 +202,24 @@ private fun AlertCard(
                     Spacer(Modifier.height(4.dp))
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Row(Modifier.padding(top = 6.dp)) {
+                FlowRow(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     if (alert.status != "resolved") {
                         if (alert.status == "new") {
-                            TextButton(onClick = onAcknowledge, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Acknowledge") }
+                            TextButton(onClick = onAcknowledge, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                if (pendingAction == "acknowledge") CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Text("Acknowledge")
+                            }
                         }
-                        TextButton(onClick = onResolve, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Resolve") }
+                        TextButton(onClick = onResolve, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            if (pendingAction == "resolve") CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            else Text("Resolve")
+                        }
                     }
                     if (alert.ticketId != null) {
-                        TextButton(onClick = onViewTicket, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        TextButton(onClick = onViewTicket, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp)) {
                             Text(alert.ticketLabel?.takeIf { it.isNotBlank() } ?: "View Ticket")
                         }
                     }

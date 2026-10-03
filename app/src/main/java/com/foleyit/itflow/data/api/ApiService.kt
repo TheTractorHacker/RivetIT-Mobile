@@ -350,6 +350,7 @@ interface ApiService {
     @POST("notifications/read-all")
     suspend fun markAllRead()
 
+    @Headers("Cache-Control: no-store")
     @GET("alerts")
     suspend fun getAlerts(
         @Query("status") status: String = "new",
