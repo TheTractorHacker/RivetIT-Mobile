@@ -54,6 +54,9 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
+    // Read-only roles still get the ticket; the controls that would be refused are hidden.
+    val canWrite = com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)
+
     // Timer
     var timerRunning by remember { mutableStateOf(false) }
     var elapsed by remember { mutableLongStateOf(0L) }
@@ -269,7 +272,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                     IconButton(onClick = { navController.navigate(Screen.TicketChat.go(id)) }) {
                         Icon(Icons.Outlined.Forum, "Live Chat")
                     }
-                    IconButton(onClick = { timerRunning = !timerRunning }) {
+                    if (canWrite) IconButton(onClick = { timerRunning = !timerRunning }) {
                         Icon(
                             if (timerRunning) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
                             "Timer",
@@ -277,7 +280,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                                    else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    if (statuses.isNotEmpty()) {
+                    if (canWrite && statuses.isNotEmpty()) {
                         IconButton(onClick = { showStatusPicker = true }) {
                             Icon(Icons.Outlined.SwapVert, "Change Status")
                         }
@@ -286,6 +289,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
             )
         },
         bottomBar = {
+            if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
             Surface(shadowElevation = 4.dp) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
@@ -310,6 +314,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         Spacer(Modifier.width(6.dp)); Text("Reply / note")
                     }
                 }
+            }
             }
         }
     ) { padding ->
@@ -790,7 +795,7 @@ private fun ReplyCard(reply: TicketReply, ticketId: Int, onDeleted: () -> Unit, 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top) {
                 Text(stripHtml(reply.body), modifier = Modifier.weight(1f))
-                IconButton(onClick = { showDeleteDialog = true },
+                if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) IconButton(onClick = { showDeleteDialog = true },
                     modifier = Modifier.size(28.dp).padding(start = 4.dp)) {
                     Icon(Icons.Outlined.Delete, contentDescription = "Delete",
                         modifier = Modifier.size(16.dp),
@@ -816,7 +821,7 @@ private fun ChargesCard(cr: ChargesResponse?, onSaveCharge: ((name: String, desc
                             color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                     }
-                    onSaveCharge?.let {
+                    onSaveCharge?.takeIf { com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT) }?.let {
                         FilledTonalIconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 if (expanded) Icons.Outlined.Close else Icons.Outlined.Add,
@@ -898,7 +903,7 @@ private fun WorksheetsCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
                 Text("Worksheets", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                onAddWorksheet?.let { action ->
+                onAddWorksheet?.takeIf { com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT) }?.let { action ->
                     FilledTonalIconButton(onClick = action, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Outlined.Add, "Add Worksheet", Modifier.size(16.dp))
                     }
@@ -925,7 +930,7 @@ private fun WorksheetsCard(
                     Text("Contact signs on pickup", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline)
                 }
-                onAddOuttake?.let { action ->
+                onAddOuttake?.takeIf { com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT) }?.let { action ->
                     FilledTonalIconButton(onClick = action, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Outlined.Add, "Add Outtake Form", Modifier.size(16.dp))
                     }

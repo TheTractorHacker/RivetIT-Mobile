@@ -9,4 +9,18 @@ object DeepLinks {
     val ALLOWED_ROUTE = Regex(
         """^(tickets|clients|assets|projects|contracts|credentials|notifications|appointments|worksheets|outtakes|search|reports|scan|profile|kb|alerts)(/\d+(/\w+)?)?$"""
     )
+
+    /**
+     * Maps an externally supplied route (FCM `action`, `deep_link_route` extra) to a real nav destination,
+     * or null when it is not allowed or has no screen. "scan" is an allowed alias for the barcode scanner
+     * (whose route is `scan/barcode`); bare `worksheets`/`outtakes` have no list screen, only per-id ones.
+     */
+    fun resolve(raw: String): String? {
+        if (!ALLOWED_ROUTE.matches(raw)) return null
+        return when (raw) {
+            "scan" -> Screen.ScanBarcode.route
+            "worksheets", "outtakes" -> null
+            else -> raw
+        }
+    }
 }

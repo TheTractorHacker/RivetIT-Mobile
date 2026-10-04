@@ -50,11 +50,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Routes that show the main ITFlow MSP AppBar
+// Routes that show the main app bar. Credentials is deliberately absent: it draws its own
+// back-arrow header (it is behind a biometric gate), so listing it here stacked two app bars.
 private val ROOT_ROUTES = setOf(
     Screen.Dashboard.route, Screen.Tickets.route, Screen.Clients.route,
     Screen.Assets.route, Screen.Projects.route, Screen.Contracts.route, Screen.Appointments.route,
-    Screen.Credentials.route,
     Screen.Notifications.route, Screen.Alerts.route
 )
 
@@ -77,6 +77,7 @@ fun MainScreen(
     var userName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
     var hasUnreadNotifications by remember { mutableStateOf(false) }
+    var capabilities by remember { mutableStateOf(com.foleyit.itflow.data.Capabilities.Unrestricted) }
 
     val themeMode by prefs.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
     val isDarkMode = when (themeMode) {
@@ -88,6 +89,11 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         userName = prefs.userName.first() ?: ""
         userEmail = prefs.userEmail.first() ?: ""
+        try {
+            ApiClient.profile().let { capabilities = com.foleyit.itflow.data.Capabilities(it.isAdmin, it.permissions) }
+        } catch (_: Exception) {
+            // Keep the permissive default; the server still enforces permissions.
+        }
         try {
             hasUnreadNotifications = ApiClient.service().getDashboard().unread > 0
         } catch (_: Exception) {
@@ -108,9 +114,9 @@ fun MainScreen(
 
     LaunchedEffect(deepLinkRoute) {
         deepLinkRoute?.let {
-            if (DeepLinks.ALLOWED_ROUTE.matches(it)) {
+            DeepLinks.resolve(it)?.let { route ->
                 try {
-                    navController.navigate(it) { launchSingleTop = true }
+                    navController.navigate(route) { launchSingleTop = true }
                 } catch (_: IllegalArgumentException) {
                     // Unknown route — silently ignore rather than crash
                 }
@@ -154,6 +160,7 @@ fun MainScreen(
                 onToggleDarkMode = { dark -> scope.launch { prefs.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT) } },
                 onNavigate = ::closeDrawerAndNavigate,
                 onSignOut = { scope.launch { drawerState.close() }; signOut() },
+                capabilities = capabilities,
             )
         }
     ) {
@@ -200,7 +207,15 @@ fun MainScreen(
             if (currentRoute in BOTTOM_NAV_ROUTES) {
                 val hierarchy = currentDest?.destination?.hierarchy
                 FloatingBottomNavBar(
-                    items = bottomNavItems,
+                    items = bottomNavItems.filter {
+                        when (it.screen.route) {
+                            Screen.Tickets.route, Screen.Appointments.route ->
+                                capabilities.canView(com.foleyit.itflow.data.Capabilities.SUPPORT)
+                            Screen.Clients.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.CLIENT)
+                            Screen.Assets.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.ASSETS)
+                            else -> true
+                        }
+                    },
                     isSelected = { item ->
                         hierarchy?.any { it.route == item.screen.route } == true || currentRoute == item.screen.route
                     },
@@ -214,6 +229,9 @@ fun MainScreen(
         if (!isOnline) {
             OfflineBanner()
         }
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.foleyit.itflow.data.LocalCapabilities provides capabilities
+        ) {
         NavHost(
             navController,
             startDestination = Screen.Dashboard.route,
@@ -257,16 +275,16 @@ fun MainScreen(
                 ContractDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
             composable(Screen.Appointments.route) { AppointmentsScreen(navController) }
-            composable(Screen.Credentials.route) { CredentialsScreen(navController) }
+            composable(Screen.Credentials.route) { RequireView(com.foleyit.itflow.data.Capabilities.CREDENTIAL, capabilities) { CredentialsScreen(navController) } }
             composable(Screen.CredDetail.route) {
                 CredentialDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
             composable(Screen.Notifications.route) {
                 NotificationsScreen(onUnreadChanged = { hasUnreadNotifications = it })
             }
-            composable(Screen.Alerts.route) { AlertsScreen(navController) }
+            composable(Screen.Alerts.route) { RequireView(com.foleyit.itflow.data.Capabilities.RMM_ALERTS, capabilities) { AlertsScreen(navController) } }
             composable(Screen.Profile.route) { ProfileScreen(navController, prefs, onChangeServer, onLoggedOut) }
-            composable(Screen.KnowledgeBase.route) { KnowledgeBaseScreen(navController) }
+            composable(Screen.KnowledgeBase.route) { RequireView(com.foleyit.itflow.data.Capabilities.KB, capabilities) { KnowledgeBaseScreen(navController) } }
             composable(Screen.KbArticleDetail.route) {
                 KbArticleDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
@@ -293,6 +311,18 @@ fun MainScreen(
             composable(Screen.ScanBarcode.route) { ScanBarcodeScreen(navController) }
         }
         }
+        }
     }
     }
+}
+
+/** Shows [content] only when the user may view [module]; otherwise a plain explanation (deep links can still reach the route). */
+@Composable
+private fun RequireView(
+    module: String,
+    capabilities: com.foleyit.itflow.data.Capabilities,
+    content: @Composable () -> Unit,
+) {
+    if (capabilities.canView(module)) content()
+    else com.foleyit.itflow.ui.components.EmptyScreen("You don't have access to this section", Icons.Outlined.Lock)
 }

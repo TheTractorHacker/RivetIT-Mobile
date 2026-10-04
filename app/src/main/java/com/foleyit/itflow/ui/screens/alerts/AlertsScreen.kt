@@ -1,5 +1,7 @@
 package com.foleyit.itflow.ui.screens.alerts
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -93,7 +95,13 @@ fun AlertsScreen(navController: NavController) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                Row(modifier = Modifier.padding(4.dp)) {
+                // At large text sizes four equal-width tabs can't fit their labels, so let them scroll instead of clipping.
+                val largeText = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
+                Row(
+                    modifier = Modifier.padding(4.dp).then(
+                        if (largeText) Modifier.horizontalScroll(rememberScrollState()) else Modifier
+                    )
+                ) {
                     STATUS_TABS.forEach { (key, label) ->
                         val selected = status == key
                         Surface(
@@ -102,10 +110,10 @@ fun AlertsScreen(navController: NavController) {
                             enabled = pendingKey == null,
                             shape = MaterialTheme.shapes.extraLarge,
                             color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            modifier = Modifier.weight(1f)
+                            modifier = if (largeText) Modifier else Modifier.weight(1f)
                         ) {
                             Box(
-                                modifier = Modifier.padding(vertical = 8.dp),
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = if (largeText) 14.dp else 0.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(

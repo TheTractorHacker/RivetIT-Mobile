@@ -329,6 +329,7 @@ private fun QuickActionsRow(navController: NavController) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
         Surface(
             onClick = { navController.navigate(Screen.CreateTicket.route) },
             modifier = Modifier
@@ -360,6 +361,7 @@ private fun QuickActionsRow(navController: NavController) {
                     style = MaterialTheme.typography.labelLarge
                 )
             }
+        }
         }
         OutlinedButton(
             onClick = { navController.navigate(Screen.ScanBarcode.route) },

@@ -54,4 +54,19 @@ class DeepLinksTest {
         assertFalse(DeepLinks.ALLOWED_ROUTE.matches(""))
         assertFalse(DeepLinks.ALLOWED_ROUTE.matches(" "))
     }
+
+    @Test
+    fun `resolve maps scan to the scanner route`() {
+        org.junit.Assert.assertEquals("scan/barcode", DeepLinks.resolve("scan"))
+    }
+
+    @Test
+    fun `resolve passes real routes through and rejects unknown or list-less ones`() {
+        org.junit.Assert.assertEquals("tickets/157/chat", DeepLinks.resolve("tickets/157/chat"))
+        org.junit.Assert.assertEquals("kb/1", DeepLinks.resolve("kb/1"))
+        org.junit.Assert.assertNull(DeepLinks.resolve("worksheets"))
+        org.junit.Assert.assertNull(DeepLinks.resolve("outtakes"))
+        org.junit.Assert.assertNull(DeepLinks.resolve("admin/settings"))
+        org.junit.Assert.assertNull(DeepLinks.resolve("tickets/../profile"))
+    }
 }

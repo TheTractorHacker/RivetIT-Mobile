@@ -401,7 +401,10 @@ data class ModuleFlags(
 data class UserProfile(
     val id: Int, val name: String, val email: String,
     val type: Int, val color: String?, val avatar: String?,
-    val modules: ModuleFlags? = null
+    val modules: ModuleFlags? = null,
+    @SerializedName("is_admin") val isAdmin: Boolean = false,
+    /** Module name -> level (0 none, 1 read, 2 write, 3 full). Null on servers that don't report it. */
+    val permissions: Map<String, Int>? = null
 )
 
 data class AddChargeRequest(

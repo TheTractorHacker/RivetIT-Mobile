@@ -72,6 +72,25 @@ The same emulator then checked ticket creation against a second fictional API. T
 
 This is a partial audit. No restricted-role, comprehensive tablet, TalkBack, rotation, reduced-motion, deep-link, write-path, or representative-device performance result is claimed here.
 
+## Live-backend pass (2026-10-04)
+
+First pass against a live fictional backend (a Summit Ridge demo server running the RivetIT API) rather than a mock, on a Pixel 7 / Android 36 emulator. A QA build (`-PqaScreenshots=true`) was used for captures.
+
+**Routes walked:** tickets, ticket detail, ticket chat, departments, department detail, assets, asset detail, projects, project detail, contracts, contract detail, credentials, notifications, appointments, search, reports hub, profile, knowledge base, KB article and alerts, in light and dark phone layouts, as an administrator. None showed an error or empty state with data present. Phone only; the tablet layouts were not re-run.
+
+| Finding | Status |
+|---|---|
+| Credentials stacked its own header under the main app bar (it was listed in `ROOT_ROUTES`). | Fixed and verified on device. |
+| The credentials gate did nothing on a device with no strong biometric enrolled: no message, no way forward. It now says what is missing and offers the system enrollment screen; the check stays `BIOMETRIC_STRONG`. | Fixed and verified on device. |
+| The `scan` deep link was in the allowlist but has no destination (the route is `scan/barcode`), so it was silently ignored. `DeepLinks.resolve` now maps it; bare `worksheets`/`outtakes` (no list screen) resolve to nothing. | Fixed and verified on device. |
+| The app ignored `permissions` and `is_admin` from `/me`: a read-only, single-department user saw every drawer item, the New Ticket button, the reply bar, timer, status picker and add buttons, and met 403s. A `Capabilities` model now hides drawer items, bottom-nav tabs, New Ticket and the ticket write controls; credentials, KB and alerts routes show an explanation when reached by deep link. Servers that report no permissions keep the old behaviour. The server still enforces everything. | Fixed. Verified on device as a read-only, one-department account. |
+| At 200% text: the tickets search placeholder wrapped letter by letter, bottom-nav labels clipped and ran together, the profile email overflowed the left margin, and the Alerts "Resolved" tab was cut off. | Fixed in code (`FlowRow` search row, capped nav label scale, centred padded profile text, scrollable alert tabs). **Not re-verified on a device**: the test environment was lost before the recheck. |
+| A knowledge-base article image showed its alt text with a broken-image box. | Seed content points at a file that does not exist; not an app defect. |
+
+**Not covered by this pass:** tablet and rotation, process recreation and draft survival, live write flows (reply/note, time entry, status change, duplicate taps) and write behaviour for restricted roles, push and login-return deep links, TalkBack, reduced motion, and the startup/scrolling/memory measurements. The restricted-role check covered read paths and visibility only. The large-text fixes above still need a device check. This issue should stay open for those.
+
+Credentials note: the pass also confirmed that the credentials list requires a strong biometric and cannot be exercised on an emulator without an enrolled fingerprint.
+
 ## Sheets and dialogs
 
 These are code inventory entries, not visual verification. Names/roles should be checked on a device in light and dark modes.

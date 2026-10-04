@@ -41,7 +41,7 @@ private fun ticketStatusColor(hex: String?): Color = try {
     Color(android.graphics.Color.parseColor(if (hex?.startsWith("#") == true) hex else "#${hex}"))
 } catch (_: Exception) { Color.Gray }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun TicketsScreen(navController: NavController) {
     val largeText = LocalDensity.current.fontScale >= 1.3f
@@ -99,26 +99,30 @@ fun TicketsScreen(navController: NavController) {
 
     Scaffold(
         floatingActionButton = {
+            if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
             FloatingActionButton(
                 onClick = { navController.navigate(Screen.CreateTicket.route) },
                 modifier = Modifier.pressScale(0.90f),
             ) {
                 Icon(Icons.Outlined.Add, "New Ticket")
             }
+            }
         }
     ) { scaffoldPadding ->
     // Only use bottom padding — top is handled by the outer MainScreen Scaffold
     Column(Modifier.fillMaxSize().padding(bottom = scaffoldPadding.calculateBottomPadding())) {
         // Compact search + Mine filter
-        Row(
+        // FlowRow: at large text sizes the Mine chip and icons drop to a second line instead of squeezing the field
+        // until "Search" wraps letter by letter.
+        FlowRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            itemVerticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it; list.onSearchChanged(it) },
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                modifier = Modifier.weight(1f).widthIn(min = 140.dp).heightIn(min = 48.dp),
                 placeholder = { Text(if (largeText) "Search" else "Search tickets…", style = MaterialTheme.typography.bodyMedium) },
                 leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(18.dp)) },
                 trailingIcon = {

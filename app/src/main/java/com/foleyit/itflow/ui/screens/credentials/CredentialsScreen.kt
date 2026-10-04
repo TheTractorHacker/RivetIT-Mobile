@@ -22,6 +22,7 @@ import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.ui.components.*
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.BiometricCrypto
+import com.foleyit.itflow.ui.util.BiometricGate
 import com.foleyit.itflow.ui.util.rememberPagedList
 import com.foleyit.itflow.ui.util.userMessage
 
@@ -33,13 +34,49 @@ fun CredentialsScreen(navController: NavController) {
     val context = LocalContext.current
     val localActivity = androidx.activity.compose.LocalActivity.current
 
+    var gateMessage by remember { mutableStateOf<String?>(null) }
+    var canEnroll by remember { mutableStateOf(false) }
+
+    fun checkAvailability(): Boolean {
+        val result = androidx.biometric.BiometricManager.from(context)
+            .canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        gateMessage = BiometricGate.unavailableMessage(result)
+        canEnroll = BiometricGate.canEnroll(result)
+        return gateMessage == null
+    }
+
+    fun openEnrollment() {
+        val intent = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.content.Intent(android.provider.Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
+                android.provider.Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+            )
+        } else {
+            android.content.Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
+        }
+        try { context.startActivity(intent) } catch (_: Exception) {
+            try { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) } catch (_: Exception) {}
+        }
+    }
+
     fun authenticate() {
-        val activity = localActivity as? FragmentActivity ?: return
-        val crypto = try { BiometricCrypto.cryptoObject() } catch (_: Exception) { return }
+        if (!checkAvailability()) return
+        val activity = localActivity as? FragmentActivity ?: run {
+            gateMessage = "Couldn't start verification. Close and reopen the app, then try again."
+            return
+        }
+        val crypto = try { BiometricCrypto.cryptoObject() } catch (_: Exception) {
+            gateMessage = "Couldn't prepare secure verification on this device. Try again, or sign in again."
+            return
+        }
         val executor = ContextCompat.getMainExecutor(context)
         val prompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 if (BiometricCrypto.confirm(result)) authenticated = true
+                else gateMessage = "Verification could not be confirmed. Please try again."
+            }
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                if (!BiometricGate.isUserDismissal(errorCode)) gateMessage = errString.toString()
             }
         })
         val info = BiometricPrompt.PromptInfo.Builder()
@@ -48,6 +85,7 @@ fun CredentialsScreen(navController: NavController) {
             .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .setNegativeButtonText("Cancel")
             .build()
+        gateMessage = null
         prompt.authenticate(info, crypto)
     }
 
@@ -60,8 +98,18 @@ fun CredentialsScreen(navController: NavController) {
                     Text("Authentication Required", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     Text("Verify your identity to view credentials", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    gateMessage?.let {
+                        Spacer(Modifier.height(16.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp))
+                    }
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = ::authenticate) { Icon(Icons.Outlined.Fingerprint, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Authenticate") }
+                    if (canEnroll) {
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = ::openEnrollment) { Text("Open security settings") }
+                    }
                 }
             }
         }

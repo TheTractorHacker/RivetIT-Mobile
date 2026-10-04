@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.foleyit.itflow.ui.navigation.BottomNavItem
 import com.foleyit.itflow.ui.navigation.Screen
 
@@ -134,6 +135,7 @@ fun AppDrawerContent(
     onToggleDarkMode: (Boolean) -> Unit,
     onNavigate: (String) -> Unit,
     onSignOut: () -> Unit,
+    capabilities: com.foleyit.itflow.data.Capabilities = com.foleyit.itflow.data.Capabilities.Unrestricted,
 ) {
     ModalDrawerSheet(modifier = Modifier.width(272.dp).fillMaxHeight()) {
         Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
@@ -184,33 +186,45 @@ fun AppDrawerContent(
                 icon = { DrawerLeadingIcon(Icons.Outlined.Notifications, hasUnreadNotifications) },
                 selected = false, onClick = { onNavigate(Screen.Notifications.route) }, modifier = DrawerItemPadding,
             )
-            NavigationDrawerItem(
-                label = { Text("Alerts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Warning) },
-                selected = false, onClick = { onNavigate(Screen.Alerts.route) }, modifier = DrawerItemPadding,
-            )
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.RMM_ALERTS)) {
+                NavigationDrawerItem(
+                    label = { Text("Alerts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Warning) },
+                    selected = false, onClick = { onNavigate(Screen.Alerts.route) }, modifier = DrawerItemPadding,
+                )
+            }
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 12.dp))
 
-            NavigationDrawerItem(
-                label = { Text("Projects") }, icon = { DrawerLeadingIcon(Icons.Outlined.AccountTree) },
-                selected = false, onClick = { onNavigate(Screen.Projects.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Reports") }, icon = { DrawerLeadingIcon(Icons.Outlined.Assessment) },
-                selected = false, onClick = { onNavigate(Screen.ReportsHub.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Knowledge Base") }, icon = { DrawerLeadingIcon(Icons.AutoMirrored.Outlined.MenuBook) },
-                selected = false, onClick = { onNavigate(Screen.KnowledgeBase.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Credentials") }, icon = { DrawerLeadingIcon(Icons.Outlined.Lock) },
-                selected = false, onClick = { onNavigate(Screen.Credentials.route) }, modifier = DrawerItemPadding,
-            )
-            NavigationDrawerItem(
-                label = { Text("Contracts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Description) },
-                selected = false, onClick = { onNavigate(Screen.Contracts.route) }, modifier = DrawerItemPadding,
-            )
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
+                NavigationDrawerItem(
+                    label = { Text("Projects") }, icon = { DrawerLeadingIcon(Icons.Outlined.AccountTree) },
+                    selected = false, onClick = { onNavigate(Screen.Projects.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.REPORTING)) {
+                NavigationDrawerItem(
+                    label = { Text("Reports") }, icon = { DrawerLeadingIcon(Icons.Outlined.Assessment) },
+                    selected = false, onClick = { onNavigate(Screen.ReportsHub.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.KB)) {
+                NavigationDrawerItem(
+                    label = { Text("Knowledge Base") }, icon = { DrawerLeadingIcon(Icons.AutoMirrored.Outlined.MenuBook) },
+                    selected = false, onClick = { onNavigate(Screen.KnowledgeBase.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.CREDENTIAL)) {
+                NavigationDrawerItem(
+                    label = { Text("Credentials") }, icon = { DrawerLeadingIcon(Icons.Outlined.Lock) },
+                    selected = false, onClick = { onNavigate(Screen.Credentials.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canView(com.foleyit.itflow.data.Capabilities.CLIENT)) {
+                NavigationDrawerItem(
+                    label = { Text("Contracts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Description) },
+                    selected = false, onClick = { onNavigate(Screen.Contracts.route) }, modifier = DrawerItemPadding,
+                )
+            }
         }
 
         HorizontalDivider(Modifier.padding(vertical = 8.dp, horizontal = 12.dp))
@@ -300,10 +314,15 @@ private fun RowScope.FloatingNavItem(item: BottomNavItem, selected: Boolean, onC
             tint = contentColor, modifier = Modifier.size(24.dp),
         )
         Spacer(Modifier.height(2.dp))
+        // The bar is a fixed 64dp tall with five equal slots, so its labels stop scaling past 130% text size
+        // (the accessibility label on the icon still carries the full name). Beyond that they clipped and ran together.
+        val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+        val labelSize = (MaterialTheme.typography.labelSmall.fontSize.value * minOf(fontScale, 1.3f) / fontScale).sp
         Text(
-            item.label, style = MaterialTheme.typography.labelSmall,
+            item.label, style = MaterialTheme.typography.labelSmall.copy(fontSize = labelSize),
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = contentColor,
+            maxLines = 1,
         )
         Spacer(Modifier.height(2.dp))
         Box(
