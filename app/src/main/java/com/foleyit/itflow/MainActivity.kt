@@ -94,7 +94,12 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        intent?.getStringExtra("deep_link_route")?.let { pendingDeepLink.value = it }
+        // Only on a genuine first launch. On recreation (rotation, process death) the launching intent is still
+        // the original one, and re-applying its route would jump the user away from where they were and lose
+        // their draft.
+        if (savedInstanceState == null) {
+            intent?.getStringExtra("deep_link_route")?.let { pendingDeepLink.value = it }
+        }
 
         setContent {
             val resolvedStart = startDestination ?: return@setContent
@@ -181,7 +186,7 @@ class MainActivity : FragmentActivity() {
                             MainScreen(
                                 prefs = prefs,
                                 deepLinkRoute = deepLink,
-                                onDeepLinkConsumed = { pendingDeepLink.value = null },
+                                onDeepLinkConsumed = { pendingDeepLink.value = null; intent?.removeExtra("deep_link_route") },
                                 onLoggedOut = {
                                     ApiClient.clearToken()
                                     navController.navigate(Screen.Login.route) {

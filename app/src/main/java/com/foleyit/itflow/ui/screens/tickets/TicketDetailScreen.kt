@@ -289,7 +289,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
             )
         },
         bottomBar = {
-            if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
+            if (state?.isSuccess == true && com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
             Surface(shadowElevation = 4.dp) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
@@ -320,7 +320,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     ) { padding ->
         when {
             state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Something went wrong. Please try again.", onRetry = ::load)
             else -> {
                 val ticket = state!!.getOrThrow()
                 LazyColumn(
