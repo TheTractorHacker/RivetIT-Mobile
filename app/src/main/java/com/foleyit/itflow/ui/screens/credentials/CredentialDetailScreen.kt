@@ -217,7 +217,7 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                                         if (showPassword) pwd else "••••••••••",
                                         Icons.Outlined.Lock,
                                         onCopy = { copy(pwd, "Password", sensitive = true) },
-                                        trailingIcon = { IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(32.dp)) { Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, null, Modifier.size(18.dp)) } }
+                                        trailingIcon = { IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(32.dp)) { Icon(if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (showPassword) "Hide password" else "Show password", Modifier.size(18.dp)) } }
                                     )
                                 }
                                 c.uri?.takeIf { it.isNotBlank() }?.let { url ->
@@ -254,7 +254,7 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                                                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                                             IconButton(onClick = { copy(genResult, "Password", sensitive = true) },
                                                 modifier = Modifier.size(32.dp)) {
-                                                Icon(Icons.Outlined.ContentCopy, null, Modifier.size(16.dp))
+                                                Icon(Icons.Outlined.ContentCopy, "Copy generated password", Modifier.size(16.dp))
                                             }
                                         }
                                     }

@@ -50,6 +50,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Widest the screen content is allowed to grow before it is centred with margins. */
+private val ContentMaxWidth = 840.dp
+
 // Routes that show the main app bar. Credentials is deliberately absent: it draws its own
 // back-arrow header (it is behind a biometric gate), so listing it here stacked two app bars.
 private val ROOT_ROUTES = setOf(
@@ -225,7 +228,9 @@ fun MainScreen(
         }
     ) { padding ->
         val isOnline by rememberIsOnline()
-        Column(Modifier.padding(padding)) {
+        // On wide screens (tablets, landscape) cap the content width and centre it; phone-style single-column
+        // lists and forms otherwise stretch edge to edge. Phones narrower than the cap are unaffected.
+        Column(Modifier.padding(padding), horizontalAlignment = Alignment.CenterHorizontally) {
         if (!isOnline) {
             OfflineBanner()
         }
@@ -235,7 +240,7 @@ fun MainScreen(
         NavHost(
             navController,
             startDestination = Screen.Dashboard.route,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).widthIn(max = ContentMaxWidth).fillMaxWidth(),
             // Fade + subtle rise (design reference's springy screen-transition motion) applied
             // once here, at the NavHost level, so every one of the ~35 destinations below gets
             // it uniformly without each composable() call needing its own animation params.

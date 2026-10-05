@@ -269,8 +269,10 @@ fun FloatingBottomNavBar(
     isSelected: (BottomNavItem) -> Boolean,
     onSelect: (String) -> Unit,
 ) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     Surface(
         modifier = Modifier
+            .widthIn(max = 600.dp)
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 10.dp)
             .height(64.dp),
@@ -288,6 +290,7 @@ fun FloatingBottomNavBar(
                 FloatingNavItem(item, isSelected(item)) { onSelect(item.screen.route) }
             }
         }
+    }
     }
 }
 

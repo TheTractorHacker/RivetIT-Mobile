@@ -79,7 +79,7 @@ fun SearchScreen(navController: NavController) {
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { query = ""; result = null; error = null },
                                     modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Outlined.Clear, null, Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Clear, "Clear search", Modifier.size(16.dp))
                                 }
                             }
                         }
