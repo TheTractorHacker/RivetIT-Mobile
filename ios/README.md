@@ -26,8 +26,8 @@ RivetIT server (a self-signed certificate is supported, see below).
 | Part | Status |
 |---|---|
 | `RivetCore` (models, API client, errors, permissions, deep links, dates, certificate reader) | **Built and unit-tested on Linux (44 tests).** Models are decoded from real responses of a RivetIT demo server. |
-| SwiftUI app (`App/`) | **Syntax-checked only.** It has never been compiled or run: it needs Xcode, and the machine it was written on is Linux. The macOS job in `.github/workflows/ios.yml` is the first real compile; expect to fix some compile errors and visual details on first run. |
-| Certificate pinning / trust flow, Face ID lock, barcode scanner | Written against Apple APIs; untested on a device. |
+| SwiftUI app (`App/`) | **Compiles for the iOS Simulator** (Xcode 16, built in CI on every push; see `.github/workflows/ios.yml`). A CI step also launches it and uploads a first-launch screenshot. It has not been exercised against a real server in a simulator or on a device. |
+| Certificate pinning / trust flow, Face ID lock, barcode scanner | Compile; behaviour untested on a device. |
 
 ## Screens (parity with Android)
 

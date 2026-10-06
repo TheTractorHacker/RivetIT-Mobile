@@ -40,3 +40,24 @@ jobs:
           xcodebuild -project RivetIT.xcodeproj -scheme RivetIT \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO build
+      - name: Launch in the simulator and take a screenshot
+        # Informational: proves the app starts (first-run server-setup screen), not just that it compiles.
+        continue-on-error: true
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+          xcrun simctl boot "iPhone 16" || true
+          xcrun simctl bootstatus "iPhone 16" -b
+          xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/RivetIT.app
+          xcrun simctl launch booted com.foleyit.itflow.ios
+          sleep 10
+          xcrun simctl io booted screenshot first-launch.png
+      - name: Upload the screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-first-launch
+          path: ios/first-launch.png
+          if-no-files-found: ignore
