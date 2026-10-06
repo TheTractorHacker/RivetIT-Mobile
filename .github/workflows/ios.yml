@@ -23,7 +23,7 @@ jobs:
 
   app-macos:
     name: Build app and run core tests (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
