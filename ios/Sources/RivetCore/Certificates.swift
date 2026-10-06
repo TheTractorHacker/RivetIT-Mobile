@@ -22,6 +22,8 @@ public struct CertificateSummary: Equatable {
     }
 }
 
+extension CertificateSummary: Identifiable { public var id: String { fingerprint } }
+
 /// Minimal DER reader: just enough X.509 to pull the subject common name and the notAfter date.
 enum X509 {
     struct Parsed { var commonName: String?; var notAfter: Date? }

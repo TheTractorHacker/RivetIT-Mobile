@@ -76,8 +76,6 @@ import RivetCore
     }
 }
 
-extension CertificateSummary: Identifiable { var id: String { fingerprint } }
-
 /// The user must type the last six characters of the fingerprint before a self-signed certificate is trusted.
 @MainActor struct CertificateTrustSheet: View {
     let certificate: CertificateSummary
