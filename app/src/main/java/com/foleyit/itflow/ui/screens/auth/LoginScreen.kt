@@ -142,7 +142,7 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
             } catch (e: NoCredentialException) {
                 error = "No passkeys found. Register one at Settings → Security on the web portal."
             } catch (e: GetCredentialUnsupportedException) {
-                error = "Passkey error: ${e.message ?: "passkeys not supported — enable your password manager as a credential provider in Android Settings"}"
+                error = "Passkey error: passkeys not supported — enable your password manager as a credential provider in Android Settings"
             } catch (e: HttpException) {
                 error = userMessage(e)
             } catch (e: Exception) {

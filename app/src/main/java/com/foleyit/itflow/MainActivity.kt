@@ -33,14 +33,22 @@ import com.foleyit.itflow.ui.screens.auth.ServerSetupScreen
 import com.foleyit.itflow.ui.screens.main.MainScreen
 import com.foleyit.itflow.ui.theme.ITFlowTheme
 import com.foleyit.itflow.ui.util.BiometricCrypto
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 
+/** Survives rotation/recreation, lost on process death or when the task is finished. */
+@Volatile private var sessionUnlocked = false
+
 class MainActivity : FragmentActivity() {
 
     private var backgroundedAt = 0L
+    // Cold start (new process / finished task) with the lock enabled must prompt before showing data.
+    private var startLocked = false
     private val pendingDeepLink = mutableStateOf<String?>(null)
 
     override fun onPause() {
@@ -56,7 +64,20 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (isFinishing) sessionUnlocked = false
         ApiClient.onUnauthorized = null
+    }
+
+    private suspend fun signOutEverywhere(prefs: AppPreferences) {
+        // Best effort: revoke server-side first, but never let an offline/slow server block local sign-out.
+        withTimeoutOrNull(5_000L) {
+            withContext(Dispatchers.IO) {
+                runCatching { ApiClient.service().registerFcmToken(com.foleyit.itflow.data.api.FcmTokenRequest("")) }
+                runCatching { ApiClient.service().logout() }
+            }
+        }
+        prefs.clearAuth()
+        ApiClient.clearToken()
     }
 
     private fun isRooted(): Boolean {
@@ -87,6 +108,7 @@ class MainActivity : FragmentActivity() {
         lifecycleScope.launch {
             val url   = prefs.serverUrl.first()
             val token = prefs.authToken.first()
+            startLocked = token != null && !sessionUnlocked && prefs.biometricLock.first()
             startDestination = when {
                 url.isBlank() -> Screen.Setup.route
                 token == null -> Screen.Login.route
@@ -108,7 +130,7 @@ class MainActivity : FragmentActivity() {
             ITFlowTheme(themeMode = themeMode, colorSeed = colorSeed) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
-                    var isLocked by remember { mutableStateOf(false) }
+                    var isLocked by remember { mutableStateOf(startLocked) }
                     val biometricEnabled by prefs.biometricLock.collectAsState(initial = false)
 
                     // Wire 401 auto-logout
@@ -132,6 +154,7 @@ class MainActivity : FragmentActivity() {
                             if (event == Lifecycle.Event.ON_RESUME &&
                                 biometricEnabled && backgroundedAt > 0 &&
                                 System.currentTimeMillis() - backgroundedAt > 5 * 60_000L) {
+                                sessionUnlocked = false
                                 isLocked = true
                             }
                         }
@@ -144,12 +167,11 @@ class MainActivity : FragmentActivity() {
                     if (isLocked) {
                         BiometricLockScreen(
                             prefs = prefs,
-                            onUnlocked = { isLocked = false },
+                            onUnlocked = { sessionUnlocked = true; isLocked = false },
                             onSignOut = {
                                 MainScope().launch {
-                                    runCatching { ApiClient.service().registerFcmToken(com.foleyit.itflow.data.api.FcmTokenRequest("")) }
-                                    prefs.clearAuth()
-                                    ApiClient.clearToken()
+                                    signOutEverywhere(prefs)
+                                    sessionUnlocked = true
                                     isLocked = false
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(0) { inclusive = true }
@@ -195,9 +217,7 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onChangeServer = {
                                     lifecycleScope.launch {
-                                        runCatching { ApiClient.service().registerFcmToken(com.foleyit.itflow.data.api.FcmTokenRequest("")) }
-                                        prefs.clearAuth()
-                                        ApiClient.clearToken()
+                                        signOutEverywhere(prefs)
                                         navController.navigate(Screen.Setup.route) {
                                             popUpTo(0) { inclusive = true }
                                         }

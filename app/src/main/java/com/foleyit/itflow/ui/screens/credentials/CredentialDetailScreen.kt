@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import com.foleyit.itflow.ui.util.generatePassword
+import com.foleyit.itflow.ui.util.openWebUrl
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -53,7 +55,7 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
             val challenge = try {
                 ApiClient.service().passkeyBegin()
             } catch (e: Exception) {
-                authError = "Could not reach server: ${e.message}"
+                authError = "Could not reach server: ${userMessage(e)}"
                 return@launch
             }
             val challengeBytes = BiometricSigningKey.base64UrlDecode(challenge.challenge)
@@ -88,7 +90,7 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                             }
                             authenticated = true
                         } catch (e: Exception) {
-                            authError = "Verification failed: ${e.message}"
+                            authError = "Verification failed: ${userMessage(e)}"
                         }
                     }
                 }
@@ -221,7 +223,7 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                                     )
                                 }
                                 c.uri?.takeIf { it.isNotBlank() }?.let { url ->
-                                    CredField("URL", url, Icons.Outlined.Link, onCopy = { copy(url, "URL") }, onTap = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) })
+                                    CredField("URL", url, Icons.Outlined.Link, onCopy = { copy(url, "URL") }, onTap = { openWebUrl(context, url) })
                                 }
                             }
                         }

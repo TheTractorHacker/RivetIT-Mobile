@@ -55,7 +55,7 @@ fun FillWorksheetScreen(worksheetId: Int, navController: NavController) {
                 snackbar.showSnackbar("Worksheet saved")
                 navController.popBackStack()
             } catch (e: Exception) {
-                snackbar.showSnackbar("Failed: ${e.message}")
+                snackbar.showSnackbar("Failed: ${com.foleyit.itflow.ui.util.userMessage(e)}")
             } finally {
                 saving = false
             }

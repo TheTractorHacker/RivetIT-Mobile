@@ -27,6 +27,7 @@ import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadingScreen
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.BiometricCrypto
+import com.foleyit.itflow.ui.util.openWebUrl
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,7 +97,7 @@ fun ClientDetailScreen(id: Int, navController: NavController) {
                                 }
                             }
                             client.website?.let {
-                                OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) },
+                                OutlinedButton(onClick = { openWebUrl(context, it) },
                                     modifier = Modifier.weight(1f)) {
                                     Icon(Icons.Outlined.Language, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Website")
                                 }

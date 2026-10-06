@@ -106,9 +106,9 @@ object ApiClient {
             .addNetworkInterceptor { chain ->
                 val response = chain.proceed(chain.request())
                 if (chain.request().method == "GET") {
-                    response.newBuilder()
-                        .header("Cache-Control", if (response.isSuccessful) "private, max-age=300" else "no-store")
-                        .build()
+                    val override = cacheControlOverride(response.header("Cache-Control"), response.isSuccessful)
+                    if (override == null) response
+                    else response.newBuilder().header("Cache-Control", override).build()
                 } else response
             }
             // Auth header

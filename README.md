@@ -29,6 +29,10 @@ Download a beta APK from the [Actions workflow](https://github.com/TheTractorHac
 
 The application ID remains `com.foleyit.itflow.internal` (`.beta` for debug builds) so existing installations can update without losing their local settings. The legacy Java/Kotlin package namespace and API route names are also retained for compatibility.
 
+### Beta APK signing limitation
+
+Beta APKs are debug builds signed with the public, committed `app/debug.keystore` (password `android`) and are debuggable. Anyone can build an APK with the same application ID and signature, so install betas only from this repository's releases and treat them as test builds, not production. Passkey Digital Asset Links trust the same public fingerprint for the beta ID. Planned fix: sign distributed betas with a CI-secret key (separate from the release key), register that fingerprint, and ship a non-debuggable `beta` build type. Use the signed release build for production.
+
 ## Development
 
 `main` is the RivetIT-Mobile branch. Pushes run lint and unit tests and produce a beta APK. Version tags also trigger a signed release build when the repository's signing secrets are configured. Run local checks with `./gradlew :app:testDebugUnitTest :app:lintDebug`.

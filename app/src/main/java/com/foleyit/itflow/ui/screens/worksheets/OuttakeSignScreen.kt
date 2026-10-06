@@ -103,7 +103,7 @@ fun OuttakeSignScreen(outtakeId: Int, navController: NavController) {
                 }
                 navController.popBackStack()
             } catch (e: Exception) {
-                error = "Failed to sign: ${e.message}"
+                error = "Failed to sign: ${com.foleyit.itflow.ui.util.userMessage(e)}"
             } finally {
                 loading = false
             }
