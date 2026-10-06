@@ -326,7 +326,10 @@ data class NotificationsResponse(val data: List<Notification>, val total: Int)
 
 data class Notification(
     val id: Int, val type: String, val message: String,
-    val action: String?, val timestamp: String?
+    val action: String?, val timestamp: String?,
+    /** Approval notifications: `catalog_request` / `workflow_task`, and the approval's id (`ref_id`). */
+    val kind: String? = null,
+    @SerializedName("ref_id") val refId: String? = null
 )
 
 // ── Client Tabs ──────────────────────────────────────────────────────────────
@@ -404,7 +407,9 @@ data class UserProfile(
     val modules: ModuleFlags? = null,
     @SerializedName("is_admin") val isAdmin: Boolean = false,
     /** Module name -> level (0 none, 1 read, 2 write, 3 full). Null on servers that don't report it. */
-    val permissions: Map<String, Int>? = null
+    val permissions: Map<String, Int>? = null,
+    /** True for module-only / restricted logins; they must not see approvals, requests or tasks. */
+    val limited: Boolean = false
 )
 
 data class AddChargeRequest(

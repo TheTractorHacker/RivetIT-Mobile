@@ -2,7 +2,7 @@ package com.foleyit.itflow.push
 
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.FcmTokenRequest
-import com.foleyit.itflow.ui.navigation.DeepLinks
+import com.foleyit.itflow.ui.navigation.PushRouting
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -14,7 +14,7 @@ class ITFlowFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title  = message.notification?.title ?: message.data["title"] ?: "RivetIT"
         val body   = message.notification?.body  ?: message.data["body"]  ?: return
-        val action = message.data["action"]?.takeIf { DeepLinks.ALLOWED_ROUTE.matches(it) }
+        val action = PushRouting.routeForPush(message.data)
         NotificationHelper.createChannel(this)
         NotificationHelper.show(this, title, body, action)
     }
