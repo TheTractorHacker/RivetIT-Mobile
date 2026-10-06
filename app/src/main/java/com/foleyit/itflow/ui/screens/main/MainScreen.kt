@@ -16,6 +16,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.local.AppPreferences
 import com.foleyit.itflow.ui.components.AppDrawerContent
@@ -41,6 +44,9 @@ import com.foleyit.itflow.ui.screens.kb.KbArticleDetailScreen
 import com.foleyit.itflow.ui.screens.kb.KnowledgeBaseScreen
 import com.foleyit.itflow.ui.screens.notifications.NotificationsScreen
 import com.foleyit.itflow.ui.screens.alerts.AlertsScreen
+import com.foleyit.itflow.ui.screens.approvals.ApprovalsScreen
+import com.foleyit.itflow.ui.screens.requests.RequestsScreen
+import com.foleyit.itflow.ui.screens.tasks.TasksScreen
 import com.foleyit.itflow.ui.screens.tickets.*
 import com.foleyit.itflow.ui.screens.search.SearchScreen
 import com.foleyit.itflow.ui.screens.reports.*
@@ -58,7 +64,8 @@ private val ContentMaxWidth = 840.dp
 private val ROOT_ROUTES = setOf(
     Screen.Dashboard.route, Screen.Tickets.route, Screen.Clients.route,
     Screen.Assets.route, Screen.Projects.route, Screen.Contracts.route, Screen.Appointments.route,
-    Screen.Notifications.route, Screen.Alerts.route
+    Screen.Notifications.route, Screen.Alerts.route,
+    Screen.Approvals.route, Screen.ApprovalDetail.route, Screen.Requests.route, Screen.MyTasks.route
 )
 
 // The 5 true root screens — only these show the floating bottom nav (the rest of ROOT_ROUTES
@@ -93,7 +100,7 @@ fun MainScreen(
         userName = prefs.userName.first() ?: ""
         userEmail = prefs.userEmail.first() ?: ""
         try {
-            ApiClient.profile().let { capabilities = com.foleyit.itflow.data.Capabilities(it.isAdmin, it.permissions) }
+            ApiClient.profile().let { capabilities = com.foleyit.itflow.data.Capabilities(it.isAdmin, it.permissions, it.limited) }
         } catch (_: Exception) {
             // Keep the permissive default; the server still enforces permissions.
         }
@@ -102,6 +109,26 @@ fun MainScreen(
         } catch (_: Exception) {
             // Chrome badge only — a failed fetch here shouldn't block rendering the screen.
         }
+    }
+
+    val badges = com.foleyit.itflow.data.repo.FeatureBadges.shared
+    val approvalsCount by badges.approvals.collectAsState()
+    val overdueTasks by badges.overdueTasks.collectAsState()
+
+    // Keep the Approvals / My tasks badges current: when the profile is known and each time the app returns to the
+    // foreground. Failures leave the last counts (the badge is a hint, the screens show the real state).
+    LifecycleResumeEffect(capabilities) {
+        val job = scope.launch {
+            if (capabilities.canUseApprovals()) {
+                runCatching { com.foleyit.itflow.data.repo.ApiApprovalsRepository().list() }
+                    .onSuccess { com.foleyit.itflow.data.repo.FeatureCache.shared.approvals = it; badges.setApprovals(it.total) }
+            }
+            if (capabilities.canUseTasks()) {
+                runCatching { com.foleyit.itflow.data.repo.ApiTasksRepository().list() }
+                    .onSuccess { com.foleyit.itflow.data.repo.FeatureCache.shared.tasks = it; badges.setOverdueTasks(it.overdue) }
+            }
+        }
+        onPauseOrDispose { job.cancel() }
     }
 
     fun closeDrawerAndNavigate(route: String) {
@@ -164,6 +191,8 @@ fun MainScreen(
                 onNavigate = ::closeDrawerAndNavigate,
                 onSignOut = { scope.launch { drawerState.close() }; signOut() },
                 capabilities = capabilities,
+                approvalsCount = approvalsCount,
+                overdueTasks = overdueTasks,
             )
         }
     ) {
@@ -177,7 +206,14 @@ fun MainScreen(
                 TopAppBar(
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Outlined.Menu, "Menu")
+                            val needsAttention = approvalsCount + overdueTasks > 0
+                            Box {
+                                Icon(
+                                    Icons.Outlined.Menu,
+                                    if (needsAttention) androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.menu_open_description) else "Menu"
+                                )
+                                if (needsAttention) UnreadDot(Modifier.align(Alignment.TopEnd))
+                            }
                         }
                     },
                     title = {
@@ -285,7 +321,25 @@ fun MainScreen(
                 CredentialDetailScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
             composable(Screen.Notifications.route) {
-                NotificationsScreen(onUnreadChanged = { hasUnreadNotifications = it })
+                NotificationsScreen(onUnreadChanged = { hasUnreadNotifications = it }, navController = navController)
+            }
+            composable(Screen.Approvals.route) {
+                RequireFeature(capabilities.canUseApprovals(), capabilities) { ApprovalsScreen(navController) }
+            }
+            composable(
+                Screen.ApprovalDetail.route,
+                arguments = listOf(navArgument("kind") { type = NavType.StringType }, navArgument("id") { type = NavType.IntType }),
+            ) {
+                val key = com.foleyit.itflow.ui.screens.approvals.ApprovalsLogic.key(
+                    it.arguments?.getString("kind"), it.arguments?.getInt("id")
+                )
+                RequireFeature(capabilities.canUseApprovals(), capabilities) { ApprovalsScreen(navController, openKey = key) }
+            }
+            composable(Screen.Requests.route) {
+                RequireFeature(capabilities.canRequest(), capabilities) { RequestsScreen(navController) }
+            }
+            composable(Screen.MyTasks.route) {
+                RequireFeature(capabilities.canUseTasks(), capabilities) { TasksScreen(navController) }
             }
             composable(Screen.Alerts.route) { RequireView(com.foleyit.itflow.data.Capabilities.RMM_ALERTS, capabilities) { AlertsScreen(navController) } }
             composable(Screen.Profile.route) { ProfileScreen(navController, prefs, onChangeServer, onLoggedOut) }
@@ -330,4 +384,17 @@ private fun RequireView(
 ) {
     if (capabilities.canView(module)) content()
     else com.foleyit.itflow.ui.components.EmptyScreen("You don't have access to this section", Icons.Outlined.Lock)
+}
+
+/** Like [RequireView] for the features that depend on the login type rather than one module's level. */
+@Composable
+private fun RequireFeature(
+    allowed: Boolean,
+    @Suppress("UNUSED_PARAMETER") capabilities: com.foleyit.itflow.data.Capabilities,
+    content: @Composable () -> Unit,
+) {
+    if (allowed) content()
+    else com.foleyit.itflow.ui.components.EmptyScreen(
+        androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.no_access), Icons.Outlined.Lock
+    )
 }
