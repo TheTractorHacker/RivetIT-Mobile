@@ -1,9 +1,10 @@
 import SwiftUI
 import RivetCore
 
-private struct LabeledField<Field: View>: View {
+@MainActor private struct LabeledField<Field: View>: View {
     let systemImage: String
-    @ViewBuilder var field: Field
+    let field: Field
+    init(systemImage: String, @ViewBuilder field: () -> Field) { self.systemImage = systemImage; self.field = field() }
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage).foregroundColor(Palette.label2).frame(width: 22)
@@ -14,7 +15,7 @@ private struct LabeledField<Field: View>: View {
     }
 }
 
-struct ServerSetupView: View {
+@MainActor struct ServerSetupView: View {
     @EnvironmentObject var session: Session
     @State private var url = "https://"
     @State private var loading = false
@@ -78,7 +79,7 @@ struct ServerSetupView: View {
 extension CertificateSummary: Identifiable { var id: String { fingerprint } }
 
 /// The user must type the last six characters of the fingerprint before a self-signed certificate is trusted.
-struct CertificateTrustSheet: View {
+@MainActor struct CertificateTrustSheet: View {
     let certificate: CertificateSummary
     var trust: () -> Void
     var cancel: () -> Void
@@ -116,7 +117,7 @@ struct CertificateTrustSheet: View {
     }
 }
 
-struct LoginView: View {
+@MainActor struct LoginView: View {
     @EnvironmentObject var session: Session
     @State private var username = ""
     @State private var password = ""

@@ -1,7 +1,7 @@
 import SwiftUI
 import RivetCore
 
-struct ClientsView: View {
+@MainActor struct ClientsView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = PagedLoader<ClientSummary>()
     @State private var search = ""
@@ -55,7 +55,7 @@ struct ClientsView: View {
     private func reload() async { await loader.reload(fetchPage) }
 }
 
-struct ClientDetailView: View {
+@MainActor struct ClientDetailView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @Environment(\.openURL) private var openURL
@@ -175,7 +175,7 @@ struct ClientDetailView: View {
 
 // MARK: Tab contents
 
-private struct ClientTab<T, Row: View>: View {
+@MainActor private struct ClientTab<T, Row: View>: View {
     let load: () async throws -> [T]
     let empty: String
     @ViewBuilder var row: (T) -> Row
@@ -190,7 +190,7 @@ private struct ClientTab<T, Row: View>: View {
     }
 }
 
-private struct ClientTickets: View {
+@MainActor private struct ClientTickets: View {
     let clientId: Int
     @EnvironmentObject var session: Session
     var body: some View {
@@ -200,7 +200,7 @@ private struct ClientTickets: View {
     }
 }
 
-private struct ClientAssets: View {
+@MainActor private struct ClientAssets: View {
     let clientId: Int
     @EnvironmentObject var session: Session
     var body: some View {
@@ -210,7 +210,7 @@ private struct ClientAssets: View {
     }
 }
 
-private struct ClientLocations: View {
+@MainActor private struct ClientLocations: View {
     let clientId: Int
     @EnvironmentObject var session: Session
     var body: some View {
@@ -229,7 +229,7 @@ private struct ClientLocations: View {
     }
 }
 
-private struct ClientCredentials: View {
+@MainActor private struct ClientCredentials: View {
     let clientId: Int
     @EnvironmentObject var session: Session
     var body: some View {
@@ -246,7 +246,7 @@ private struct ClientCredentials: View {
     }
 }
 
-private struct ClientContracts: View {
+@MainActor private struct ClientContracts: View {
     let clientId: Int
     @EnvironmentObject var session: Session
     var body: some View {

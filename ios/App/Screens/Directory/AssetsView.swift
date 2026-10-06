@@ -16,7 +16,7 @@ private func assetSymbol(_ type: String?) -> String {
     }
 }
 
-struct AssetRow: View {
+@MainActor struct AssetRow: View {
     let asset: AssetSummary
     var showClient = true
     var body: some View {
@@ -36,7 +36,7 @@ struct AssetRow: View {
     }
 }
 
-struct AssetsView: View {
+@MainActor struct AssetsView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @StateObject private var loader = PagedLoader<AssetSummary>()
@@ -91,7 +91,7 @@ struct AssetsView: View {
     private func reload() async { await loader.reload(fetchPage) }
 }
 
-struct AssetDetailView: View {
+@MainActor struct AssetDetailView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @StateObject private var loader = Loader<AssetDetail>()
@@ -159,7 +159,7 @@ struct AssetDetailView: View {
 // MARK: Barcode scanner
 
 /// Scans a barcode / QR code and opens the asset whose tag or serial matches.
-struct ScannerView: View {
+@MainActor struct ScannerView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @State private var permission: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)

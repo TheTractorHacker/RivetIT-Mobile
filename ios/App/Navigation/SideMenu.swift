@@ -2,7 +2,7 @@ import SwiftUI
 import RivetCore
 
 /// The Android navigation drawer: profile header, destinations (hidden when the role cannot use them), theme, sign out.
-struct SideMenu: View {
+@MainActor struct SideMenu: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
 

@@ -1,0 +1,42 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  core-linux:
+    name: RivetCore tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:5.10-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit tests
+        working-directory: ios
+        run: swift test
+
+  app-macos:
+    name: Build app and run core tests (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run RivetCore tests on macOS
+        working-directory: ios
+        run: swift test
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build the app for the iOS Simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build

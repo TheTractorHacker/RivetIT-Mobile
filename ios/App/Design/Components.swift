@@ -3,7 +3,7 @@ import RivetCore
 
 // MARK: Brand
 
-struct BrandMark: View {
+@MainActor struct BrandMark: View {
     var size: CGFloat = 28
     var body: some View {
         ZStack {
@@ -19,7 +19,7 @@ struct BrandMark: View {
 
 enum PillTone { case gray, blue, cyan, lavender, danger, custom(Color) }
 
-struct Pill: View {
+@MainActor struct Pill: View {
     let text: String
     var tone: PillTone = .gray
     var small = false
@@ -43,7 +43,7 @@ struct Pill: View {
     }
 }
 
-struct AvatarCircle: View {
+@MainActor struct AvatarCircle: View {
     let letter: String
     var size: CGFloat = 42
     var body: some View {
@@ -54,7 +54,7 @@ struct AvatarCircle: View {
     }
 }
 
-struct IconTile: View {
+@MainActor struct IconTile: View {
     let systemName: String
     var size: CGFloat = 40
     var round = false
@@ -67,7 +67,7 @@ struct IconTile: View {
 }
 
 /// Capsule filter row with a single selection (the Android FilterChip rows).
-struct FilterChips: View {
+@MainActor struct FilterChips: View {
     let items: [String]
     @Binding var selection: Int
     var body: some View {
@@ -87,7 +87,7 @@ struct FilterChips: View {
     }
 }
 
-struct SearchField: View {
+@MainActor struct SearchField: View {
     let placeholder: String
     @Binding var text: String
     var body: some View {
@@ -106,7 +106,7 @@ struct SearchField: View {
 
 // MARK: Rows
 
-struct KeyValueRow: View {
+@MainActor struct KeyValueRow: View {
     let key: String
     let value: String
     var body: some View {
@@ -118,7 +118,7 @@ struct KeyValueRow: View {
     }
 }
 
-struct SectionLabel: View {
+@MainActor struct SectionLabel: View {
     let text: String
     var tint = false
     var body: some View {
@@ -127,8 +127,9 @@ struct SectionLabel: View {
     }
 }
 
-struct ListRowCard<Content: View>: View {
-    @ViewBuilder var content: Content
+@MainActor struct ListRowCard<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
     var body: some View {
         HStack(spacing: 12) { content }
             .padding(.horizontal, 14).padding(.vertical, 12)
@@ -158,7 +159,7 @@ struct OutlineButtonStyle: ButtonStyle {
     }
 }
 
-struct FloatingButton: View {
+@MainActor struct FloatingButton: View {
     let systemName: String
     let label: String
     let action: () -> Void
@@ -177,7 +178,7 @@ struct FloatingButton: View {
 
 // MARK: States
 
-struct ErrorStateView: View {
+@MainActor struct ErrorStateView: View {
     let message: String
     var retry: (() async -> Void)?
     var body: some View {
@@ -191,7 +192,7 @@ struct ErrorStateView: View {
     }
 }
 
-struct EmptyStateView: View {
+@MainActor struct EmptyStateView: View {
     let title: String
     var systemImage = "tray"
     var body: some View {
@@ -202,12 +203,12 @@ struct EmptyStateView: View {
     }
 }
 
-struct LoadingStateView: View {
+@MainActor struct LoadingStateView: View {
     var body: some View { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
 }
 
 /// Renders a `Loader` as loading / error-with-retry / content.
-struct LoadView<T, Content: View>: View {
+@MainActor struct LoadView<T, Content: View>: View {
     @ObservedObject var loader: Loader<T>
     var retry: () async -> Void
     @ViewBuilder var content: (T) -> Content
@@ -222,21 +223,22 @@ struct LoadView<T, Content: View>: View {
 }
 
 /// Shown instead of a screen the signed-in user's role cannot use (reachable by deep link even though menus hide it).
-struct AccessDeniedView: View {
+@MainActor struct AccessDeniedView: View {
     var body: some View { EmptyStateView(title: "You don't have access to this section", systemImage: "lock") }
 }
 
-struct AccessGuard<Content: View>: View {
+@MainActor struct AccessGuard<Content: View>: View {
     @EnvironmentObject var session: Session
     let module: String
-    @ViewBuilder var content: Content
+    let content: Content
+    init(module: String, @ViewBuilder content: () -> Content) { self.module = module; self.content = content() }
     var body: some View {
         if session.capabilities.canView(module) { content } else { AccessDeniedView() }
     }
 }
 
 /// Inline banner for a failed write that keeps the user's input in place.
-struct InlineError: View {
+@MainActor struct InlineError: View {
     let message: String
     var body: some View {
         Text(message).font(.footnote).foregroundColor(Palette.danger)
@@ -246,7 +248,7 @@ struct InlineError: View {
 
 // MARK: Ticket rows
 
-struct TicketRow: View {
+@MainActor struct TicketRow: View {
     let ticket: TicketSummary
     var showAssignee = true
 

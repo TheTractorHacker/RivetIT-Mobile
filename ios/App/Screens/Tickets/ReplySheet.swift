@@ -3,7 +3,7 @@ import RivetCore
 
 /// Reply / internal note / time entry / status change in one sheet. Waits for the server before closing, blocks repeat
 /// taps while saving, and keeps everything typed if the write fails.
-struct ReplySheet: View {
+@MainActor struct ReplySheet: View {
     let ticketId: Int
     let statuses: [TicketStatus]
     var initialMinutes: Int = 0

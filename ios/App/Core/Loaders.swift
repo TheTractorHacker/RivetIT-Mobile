@@ -25,7 +25,7 @@ final class Loader<T>: ObservableObject {
 
 /// Paged list loader (page numbers start at 1). A reload keeps the old rows until the new first page arrives.
 @MainActor
-final class PagedLoader<T: Identifiable>: ObservableObject where T.ID: Hashable {
+final class PagedLoader<T: Identifiable & Decodable>: ObservableObject where T.ID: Hashable {
     @Published private(set) var state = PagedState<T>()
     private var generation = 0
 

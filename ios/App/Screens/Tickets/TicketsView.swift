@@ -12,7 +12,7 @@ private struct TicketQuery: Equatable {
     var onsite = false
 }
 
-struct TicketsView: View {
+@MainActor struct TicketsView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @StateObject private var loader = PagedLoader<TicketSummary>()
@@ -172,7 +172,7 @@ struct TicketsView: View {
     }
 }
 
-struct TicketFilterSheet: View {
+@MainActor struct TicketFilterSheet: View {
     @Binding var priority: String?
     @Binding var categoryId: Int?
     let categories: [TicketCategory]

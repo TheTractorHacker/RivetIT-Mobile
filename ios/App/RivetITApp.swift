@@ -17,7 +17,7 @@ struct RivetITApp: App {
 
 /// Chooses between server setup, sign-in and the main shell, and covers the app with a lock screen when the
 /// biometric lock is on (at cold start and after five minutes in the background).
-struct RootView: View {
+@MainActor struct RootView: View {
     @EnvironmentObject var session: Session
     @Environment(\.scenePhase) private var scenePhase
     @State private var locked = false
@@ -35,6 +35,11 @@ struct RootView: View {
         }
         .preferredColorScheme(session.themeMode.colorScheme)
         .animation(.default, value: session.phase)
+        .onOpenURL { url in
+            // rivetit://tickets/157  ->  "tickets/157". Only allow-listed routes are ever followed (see DeepLinks).
+            let parts = ([url.host ?? ""] + url.pathComponents.filter { $0 != "/" }).filter { !$0.isEmpty }
+            session.pendingDeepLink = parts.joined(separator: "/")
+        }
         .onAppear {
             if !launchChecked {
                 launchChecked = true
@@ -53,7 +58,7 @@ struct RootView: View {
     }
 }
 
-struct LockView: View {
+@MainActor struct LockView: View {
     var unlocked: () -> Void
     @State private var message: String?
 

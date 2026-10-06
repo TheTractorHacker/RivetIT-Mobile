@@ -48,6 +48,8 @@ final class Session: ObservableObject {
     @Published private(set) var capabilities: Capabilities = .unrestricted
     @Published var hasUnread = false
     @Published var notice: String?
+    /// A `rivetit://…` link received before the user was signed in; followed once the main screen is showing.
+    @Published var pendingDeepLink: String?
     @Published var themeMode: ThemeMode {
         didSet { UserDefaults.standard.set(themeMode.rawValue, forKey: Keys.theme) }
     }

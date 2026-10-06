@@ -2,7 +2,7 @@ import SwiftUI
 import RivetCore
 
 /// Signed-in shell: five tabs (same as the Android bottom bar) plus the side menu that replaces the Android drawer.
-struct MainView: View {
+@MainActor struct MainView: View {
     @EnvironmentObject var session: Session
     @StateObject private var router = Router()
 
@@ -41,6 +41,14 @@ struct MainView: View {
         }
         .animation(.easeOut(duration: 0.25), value: router.menuOpen)
         .environmentObject(router)
+        .onAppear { followPendingLink() }
+        .onChange(of: session.pendingDeepLink) { _ in followPendingLink() }
+    }
+
+    private func followPendingLink() {
+        guard let raw = session.pendingDeepLink else { return }
+        session.pendingDeepLink = nil
+        router.handleDeepLink(raw)
     }
 
     private func root<Content: View>(_ tab: AppTab, @ViewBuilder _ content: () -> Content) -> some View {
@@ -52,7 +60,7 @@ struct MainView: View {
 }
 
 /// Maps a route to its screen.
-struct RouteView: View {
+@MainActor struct RouteView: View {
     let route: AppRoute
 
     var body: some View {
@@ -84,7 +92,7 @@ struct RouteView: View {
 }
 
 /// Leading menu button + brand, trailing search / alerts / notifications: the Android app bar, in a navigation bar.
-struct RootToolbar: ViewModifier {
+@MainActor struct RootToolbar: ViewModifier {
     @EnvironmentObject var router: Router
     @EnvironmentObject var session: Session
     var hideBack = false

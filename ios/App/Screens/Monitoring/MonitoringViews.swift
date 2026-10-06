@@ -3,7 +3,7 @@ import RivetCore
 
 // MARK: Alerts
 
-struct AlertsView: View {
+@MainActor struct AlertsView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = Loader<[AlertItem]>()
     @State private var statusIndex = 0
@@ -81,7 +81,7 @@ struct AlertsView: View {
 
 // MARK: Notifications
 
-struct NotificationsView: View {
+@MainActor struct NotificationsView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @StateObject private var loader = Loader<[AppNotification]>()
@@ -158,7 +158,7 @@ struct NotificationsView: View {
 
 // MARK: Appointments
 
-struct AppointmentsView: View {
+@MainActor struct AppointmentsView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @Environment(\.openURL) private var openURL
@@ -254,7 +254,7 @@ struct AppointmentsView: View {
     }
 }
 
-struct CreateAppointmentSheet: View {
+@MainActor struct CreateAppointmentSheet: View {
     var onCreated: () -> Void
     @EnvironmentObject var session: Session
     @Environment(\.dismiss) private var dismiss

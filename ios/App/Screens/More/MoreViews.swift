@@ -4,7 +4,7 @@ import RivetCore
 
 // MARK: Reports
 
-struct ReportsView: View {
+@MainActor struct ReportsView: View {
     private struct Item: Identifiable { let id: String; let symbol: String; let title: String; let subtitle: String }
     private let tickets = [
         Item(id: "time", symbol: "timer", title: "Time Summary", subtitle: "Hours logged by department"),
@@ -55,7 +55,7 @@ struct ReportsView: View {
 }
 
 /// Reports that have not been ported yet say so plainly.
-struct ReportUnavailableView: View {
+@MainActor struct ReportUnavailableView: View {
     let title: String
     var body: some View {
         EmptyStateView(title: "\(title) isn't available in the iOS app yet. Open it in the web app or the Android app.", systemImage: "chart.bar")
@@ -63,7 +63,7 @@ struct ReportUnavailableView: View {
     }
 }
 
-struct OverviewReportView: View {
+@MainActor struct OverviewReportView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = Loader<OverviewReport>()
 
@@ -100,7 +100,7 @@ struct OverviewReportView: View {
 
 // MARK: Profile
 
-struct ProfileView: View {
+@MainActor struct ProfileView: View {
     @EnvironmentObject var session: Session
     @State private var name = ""
     @State private var email = ""
@@ -210,7 +210,7 @@ struct ProfileView: View {
     }
 }
 
-struct ChangePasswordSheet: View {
+@MainActor struct ChangePasswordSheet: View {
     let name: String
     let email: String
     @EnvironmentObject var session: Session
@@ -255,7 +255,7 @@ struct ChangePasswordSheet: View {
 
 // MARK: Knowledge base
 
-struct KnowledgeBaseView: View {
+@MainActor struct KnowledgeBaseView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = PagedLoader<KbArticleSummary>()
     @State private var search = ""
@@ -311,7 +311,7 @@ struct KnowledgeBaseView: View {
     private func reload() async { await loader.reload(fetchPage) }
 }
 
-struct KbArticleView: View {
+@MainActor struct KbArticleView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @Environment(\.openURL) private var openURL
@@ -355,7 +355,7 @@ struct KbArticleView: View {
 
 /// Credentials sit behind Face ID / Touch ID / passcode. Names and URLs are listed; revealing a secret is not in this
 /// build (the Android app uses a signed biometric challenge for that).
-struct CredentialsView: View {
+@MainActor struct CredentialsView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = PagedLoader<CredentialSummary>()
     @State private var unlocked = false
@@ -435,7 +435,7 @@ struct CredentialsView: View {
 
 // MARK: Search
 
-struct SearchView: View {
+@MainActor struct SearchView: View {
     @EnvironmentObject var session: Session
     @State private var query = ""
     @State private var result: SearchResult?

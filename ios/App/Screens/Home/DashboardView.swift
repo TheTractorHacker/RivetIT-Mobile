@@ -7,7 +7,7 @@ private struct DashboardData {
     var activeAlerts: Int
 }
 
-struct DashboardView: View {
+@MainActor struct DashboardView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @StateObject private var loader = Loader<DashboardData>()

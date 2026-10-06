@@ -1,7 +1,7 @@
 import SwiftUI
 import RivetCore
 
-struct TicketDetailView: View {
+@MainActor struct TicketDetailView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
@@ -167,7 +167,7 @@ struct TicketDetailView: View {
     }
 }
 
-struct ReplyCard: View {
+@MainActor struct ReplyCard: View {
     let reply: TicketReply
     var body: some View {
         let isNote = ["internal", "note"].contains(reply.type.lowercased())
@@ -194,7 +194,7 @@ struct ReplyCard: View {
 }
 
 /// Worksheets / outtake forms attached to a ticket (read-only lists, like the Android card without the add buttons).
-struct FormsCard: View {
+@MainActor struct FormsCard: View {
     let ticketId: Int
     @EnvironmentObject var session: Session
     @State private var worksheets: [WorksheetSummary] = []

@@ -1,7 +1,7 @@
 import SwiftUI
 import RivetCore
 
-struct CreateTicketView: View {
+@MainActor struct CreateTicketView: View {
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
     @State private var subject = ""
@@ -94,7 +94,7 @@ struct CreateTicketView: View {
 }
 
 /// Searches the server by name so departments beyond the first page are reachable.
-struct DepartmentPicker: View {
+@MainActor struct DepartmentPicker: View {
     var onPick: (ClientSummary) -> Void
     @EnvironmentObject var session: Session
     @Environment(\.dismiss) private var dismiss
@@ -137,7 +137,7 @@ struct DepartmentPicker: View {
     }
 }
 
-struct CategoryPicker: View {
+@MainActor struct CategoryPicker: View {
     let selected: TicketCategory?
     var onPick: (TicketCategory?) -> Void
     @EnvironmentObject var session: Session

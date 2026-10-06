@@ -2,7 +2,7 @@ import SwiftUI
 import RivetCore
 
 /// Live chat for a ticket: polls for new messages while the screen is visible.
-struct TicketChatView: View {
+@MainActor struct TicketChatView: View {
     let ticketId: Int
     @EnvironmentObject var session: Session
     @State private var messages: [ChatMessage] = []

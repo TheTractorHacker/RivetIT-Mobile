@@ -3,7 +3,7 @@ import RivetCore
 
 // MARK: Projects
 
-struct ProjectsView: View {
+@MainActor struct ProjectsView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = PagedLoader<ProjectSummary>()
     @State private var search = ""
@@ -72,7 +72,7 @@ struct ProjectsView: View {
     private func reload() async { await loader.reload(fetchPage) }
 }
 
-struct ProjectDetailView: View {
+@MainActor struct ProjectDetailView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @StateObject private var loader = Loader<ProjectDetail>()
@@ -178,7 +178,7 @@ struct ProjectDetailView: View {
 
 // MARK: Contracts
 
-struct ContractsView: View {
+@MainActor struct ContractsView: View {
     @EnvironmentObject var session: Session
     @StateObject private var loader = PagedLoader<ContractSummary>()
     @State private var search = ""
@@ -235,7 +235,7 @@ struct ContractsView: View {
     private func reload() async { await loader.reload(fetchPage) }
 }
 
-struct ContractDetailView: View {
+@MainActor struct ContractDetailView: View {
     let id: Int
     @EnvironmentObject var session: Session
     @Environment(\.openURL) private var openURL
