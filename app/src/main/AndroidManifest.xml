@@ -11,6 +11,7 @@
          installation on devices/Chromebooks without a camera. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+
     <application
         android:name=".ITFlowApplication"
         android:allowBackup="false"
@@ -53,6 +54,16 @@
             </intent-filter>
         </service>
 
+        <!-- Hands downloaded attachments to viewer apps and camera captures to the camera app, nothing else. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 </manifest>
