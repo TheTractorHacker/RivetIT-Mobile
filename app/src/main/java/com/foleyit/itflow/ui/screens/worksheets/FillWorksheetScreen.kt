@@ -35,7 +35,7 @@ fun FillWorksheetScreen(worksheetId: Int, navController: NavController) {
         scope.launch {
             val result = runCatching { ApiClient.service().getWorksheet(worksheetId) }
             worksheet = result.getOrNull()
-            loadError = if (result.isFailure) result.exceptionOrNull()?.message ?: "Failed to load" else null
+            loadError = if (result.isFailure) result.exceptionOrNull()?.let { com.foleyit.itflow.ui.util.userMessage(it) } ?: "Failed to load" else null
             worksheet?.fields?.forEach { f ->
                 if (!f.value.isNullOrEmpty()) fieldValues = fieldValues + (f.id to f.value)
             }

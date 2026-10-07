@@ -104,6 +104,10 @@ fun CreateTicketScreen(navController: NavController) {
         }
     }
 
+    // The inline message sits at the bottom of a scrollable form, below the visible area on most phones,
+    // so surface every error in the snackbar above the Create button as well.
+    LaunchedEffect(error) { error?.let { snackbar.showSnackbar(it) } }
+
     fun submit() {
         if (saving) return
         if (subject.isBlank()) { error = "Subject required"; return }

@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.worksheets
 
 import android.graphics.Bitmap
+import com.foleyit.itflow.ui.util.userMessage
 import android.util.Base64
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -163,7 +164,7 @@ fun OuttakeSignScreen(outtakeId: Int, navController: NavController) {
     ) { padding ->
         when {
             outtake == null -> LoadingScreen()
-            outtake!!.isFailure -> ErrorScreen(outtake!!.exceptionOrNull()?.message ?: "")
+            outtake!!.isFailure -> ErrorScreen(outtake!!.exceptionOrNull()?.let { userMessage(it) } ?: "")
             else -> {
                 val ot = outtake!!.getOrThrow()
                 LazyColumn(

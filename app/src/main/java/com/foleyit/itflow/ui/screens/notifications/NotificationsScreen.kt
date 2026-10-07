@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.notifications
 
 import androidx.compose.foundation.layout.*
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -80,7 +81,7 @@ fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}) {
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 state == null -> LoadingScreen()
-                state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+                state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
                 else -> {
                     val notifs = state!!.getOrThrow().data
                     if (notifs.isEmpty()) EmptyScreen("No new notifications", Icons.Outlined.NotificationsNone)

@@ -13,10 +13,12 @@ import androidx.compose.material.icons.outlined.SyncAlt
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -37,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
@@ -44,16 +47,27 @@ import javax.net.ssl.SSLHandshakeException
 
 @Composable
 fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
-    var url by remember { mutableStateOf("https://") }
+    // Saveable so a rotation does not wipe what was typed or dismiss the certificate prompt.
+    var url by rememberSaveable { mutableStateOf("https://") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var pendingCert by remember { mutableStateOf<X509Certificate?>(null) }
+    var pendingCertBytes by rememberSaveable { mutableStateOf<ByteArray?>(null) }
+    val pendingCert = remember(pendingCertBytes) {
+        pendingCertBytes?.let { bytes ->
+            runCatching {
+                CertificateFactory.getInstance("X.509").generateCertificate(bytes.inputStream()) as X509Certificate
+            }.getOrNull()
+        }
+    }
     val scope = rememberCoroutineScope()
 
     fun connect(trustedSha: String? = null) {
         val cleanUrl = normalizeServerUrl(url)
         url = cleanUrl
-        if (!cleanUrl.startsWith("https://") || cleanUrl.length <= "https://".length) {
+        if (cleanUrl.length <= "https://".length) {
+            error = "Enter your server address"; return
+        }
+        if (!cleanUrl.startsWith("https://")) {
             error = "URL must start with https://"; return
         }
         loading = true; error = null
@@ -82,7 +96,7 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 // Certificate not trusted by system — probe it and offer to accept
                 val cert = withContext(Dispatchers.IO) { probeCertificate("$cleanUrl/api/v1/auth") }
                 if (cert != null) {
-                    pendingCert = cert
+                    pendingCertBytes = cert.encoded
                 } else {
                     error = "SSL error and could not retrieve certificate.\n${userMessage(e)}"
                 }
@@ -101,11 +115,21 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
         var confirmInput by remember(fingerprint) { mutableStateOf("") }
         val confirmed = fingerprintSuffixMatches(confirmInput, fingerprint)
         AlertDialog(
-            onDismissRequest = { pendingCert = null },
+            onDismissRequest = { pendingCertBytes = null },
             icon = { Icon(Icons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Untrusted Certificate") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The dialog has its own window and does not resize for the keyboard, so on short/landscape
+                // screens it would cover Trust & Connect. Close it once the code is complete (or on Done).
+                // The controller must come from inside the dialog content to reach the dialog's window.
+                val keyboard = LocalSoftwareKeyboardController.current
+                LaunchedEffect(confirmed) { if (confirmed) keyboard?.hide() }
+                // Scrollable: with the keyboard up (or in landscape) the confirm field and buttons can
+                // otherwise be pushed off the visible part of the dialog.
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
                         "This server's certificate is not signed by a trusted authority. If you " +
                         "did not set up this server yourself, or you're on a network you don't " +
@@ -143,6 +167,8 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
                         value = confirmInput,
                         onValueChange = { confirmInput = it },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
                     )
@@ -152,7 +178,7 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 Button(
                     onClick = {
                         val sha = fingerprint
-                        pendingCert = null
+                        pendingCertBytes = null
                         connect(trustedSha = sha)
                     },
                     enabled = confirmed,
@@ -166,7 +192,7 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingCert = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingCertBytes = null }) { Text("Cancel") }
             }
         )
     }

@@ -57,10 +57,10 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     // Read-only roles still get the ticket; the controls that would be refused are hidden.
     val canWrite = com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)
 
-    // Timer
-    var timerRunning by remember { mutableStateOf(false) }
-    var elapsed by remember { mutableLongStateOf(0L) }
-    var timerStart by remember { mutableLongStateOf(0L) }
+    // Timer (saveable so a rotation does not silently discard time that was being tracked)
+    var timerRunning by rememberSaveable { mutableStateOf(false) }
+    var elapsed by rememberSaveable { mutableLongStateOf(0L) }
+    var timerStart by rememberSaveable { mutableLongStateOf(0L) }
 
     // Sheets
     var showReply by rememberSaveable { mutableStateOf(false) }

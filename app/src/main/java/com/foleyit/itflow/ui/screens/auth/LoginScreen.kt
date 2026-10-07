@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,14 +50,15 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: () -> Unit) {
-    var username by remember { mutableStateOf("") }
+    // Username and the 2FA step survive rotation; the password is deliberately not saved into instance state.
+    var username by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var totpCode by remember { mutableStateOf("") }
     var obscure by remember { mutableStateOf(true) }
     var loading by remember { mutableStateOf(false) }
     var passkeyPending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var requires2fa by remember { mutableStateOf(false) }
+    var requires2fa by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val localActivity = androidx.activity.compose.LocalActivity.current
@@ -78,8 +80,12 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
     }
 
     fun login() {
-        if (username.isBlank() || password.isBlank()) return
-        if (requires2fa && totpCode.isBlank()) return
+        if (username.isBlank() || password.isBlank()) {
+            error = "Enter your username and password"; return
+        }
+        if (requires2fa && totpCode.isBlank()) {
+            error = "Enter your 2FA code"; return
+        }
         loading = true; error = null
         scope.launch {
             try {
@@ -93,7 +99,11 @@ fun LoginScreen(prefs: AppPreferences, onLoggedIn: () -> Unit, onChangeServer: (
                 if (resp.requires2fa == true) { requires2fa = true; loading = false; return@launch }
                 finishLogin(resp)
             } catch (e: Exception) {
-                error = if (requires2fa) "Invalid 2FA code" else "Invalid username or password"
+                error = when {
+                    e is java.io.IOException -> userMessage(e)
+                    requires2fa -> "Invalid 2FA code"
+                    else -> "Invalid username or password"
+                }
             } finally { loading = false }
         }
     }

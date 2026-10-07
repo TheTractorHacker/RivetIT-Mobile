@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.projects
 
 import androidx.compose.foundation.background
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -98,7 +99,7 @@ fun ProjectDetailScreen(id: Int, navController: NavController) {
     ) { padding ->
         when {
             state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Error", onRetry = ::load)
             else -> {
                 val p = state!!.getOrThrow()
                 val ticketsClosed = p.tickets.count { it.closedAt != null }

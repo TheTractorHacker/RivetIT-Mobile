@@ -94,12 +94,17 @@ object ApiClient {
             }
             // Serve stale cache when offline
             .addInterceptor { chain ->
-                val request = if (!isOnline()) {
-                    chain.request().newBuilder()
-                        .cacheControl(CacheControl.FORCE_CACHE)
-                        .build()
-                } else chain.request()
-                chain.proceed(request)
+                if (isOnline() || chain.request().method != "GET") return@addInterceptor chain.proceed(chain.request())
+                val response = chain.proceed(
+                    chain.request().newBuilder().cacheControl(CacheControl.FORCE_CACHE).build()
+                )
+                // A cache miss comes back as a synthetic 504; surface it as a network failure so the UI
+                // says "check your connection" rather than blaming the server.
+                if (response.code == 504 && response.networkResponse == null) {
+                    response.close()
+                    throw java.io.IOException("Offline and no cached copy available")
+                }
+                response
             }
             // Cache successful GETs only. A cached 404 or 401 makes Retry
             // repeat an obsolete failure even after the server recovers.

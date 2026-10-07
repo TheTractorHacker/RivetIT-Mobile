@@ -51,9 +51,19 @@ fun AppointmentsScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
+    // Switching the When/Mine chips mid-request must drop the older call, otherwise a slow earlier
+    // response can overwrite the list for the filter that is now selected.
+    var loadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     fun load() {
-        scope.launch {
-            state = runCatching { ApiClient.service().getAppointments(when_, if (mineOnly) 1 else 0) }
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            state = try {
+                Result.success(ApiClient.service().getAppointments(when_, if (mineOnly) 1 else 0))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
     LaunchedEffect(when_, mineOnly) { load() }

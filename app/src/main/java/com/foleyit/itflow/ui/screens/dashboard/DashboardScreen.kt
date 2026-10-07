@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,7 +73,7 @@ fun DashboardScreen(navController: NavController) {
 
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Error", onRetry = ::load)
         else -> {
             val dash = state!!.getOrThrow()
             val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)

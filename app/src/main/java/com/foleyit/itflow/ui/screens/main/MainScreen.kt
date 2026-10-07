@@ -1,5 +1,11 @@
 package com.foleyit.itflow.ui.screens.main
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -12,6 +18,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -89,6 +97,22 @@ fun MainScreen(
         else -> isSystemInDarkTheme()
     }
 
+    // Android 13+ keeps notifications off until the user grants POST_NOTIFICATIONS, so ask once
+    // the main UI is showing (not on the login screen). The system suppresses the dialog after
+    // repeated denials, which is the user's call to make.
+    val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // Back should dismiss an open drawer rather than leave the app.
+    BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
+
     LaunchedEffect(Unit) {
         userName = prefs.userName.first() ?: ""
         userEmail = prefs.userEmail.first() ?: ""
@@ -152,6 +176,21 @@ fun MainScreen(
         }
     }
 
+    var showSignOutConfirm by remember { mutableStateOf(false) }
+    if (showSignOutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirm = false },
+            title = { Text("Sign Out?") },
+            text = { Text("You will need to sign in again to use RivetIT.") },
+            confirmButton = {
+                TextButton(onClick = { showSignOutConfirm = false; signOut() }) {
+                    Text("Sign Out", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showSignOutConfirm = false }) { Text("Cancel") } }
+        )
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -162,7 +201,7 @@ fun MainScreen(
                 isDarkMode = isDarkMode,
                 onToggleDarkMode = { dark -> scope.launch { prefs.setThemeMode(if (dark) ThemeMode.DARK else ThemeMode.LIGHT) } },
                 onNavigate = ::closeDrawerAndNavigate,
-                onSignOut = { scope.launch { drawerState.close() }; signOut() },
+                onSignOut = { scope.launch { drawerState.close() }; showSignOutConfirm = true },
                 capabilities = capabilities,
             )
         }

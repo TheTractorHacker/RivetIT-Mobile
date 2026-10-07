@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.assets
 
 import androidx.compose.foundation.layout.*
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -48,7 +49,7 @@ fun AssetDetailScreen(id: Int, navController: NavController) {
     ) { padding ->
         when {
             state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Error", onRetry = ::load)
             else -> {
                 val a = state!!.getOrThrow()
                 LazyColumn(

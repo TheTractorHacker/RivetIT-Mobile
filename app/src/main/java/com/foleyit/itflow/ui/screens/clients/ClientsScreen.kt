@@ -1,5 +1,6 @@
 package com.foleyit.itflow.ui.screens.clients
 
+import com.foleyit.itflow.ui.util.avatarInitial
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,7 +56,7 @@ fun ClientsScreen(navController: NavController) {
                                         color = MaterialTheme.colorScheme.primaryContainer,
                                         modifier = Modifier.size(40.dp)) {
                                         Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-                                            Text(c.name.first().uppercaseChar().toString(),
+                                            Text(avatarInitial(c.name),
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
                                         }

@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.contracts
 
 import android.content.ActivityNotFoundException
+import com.foleyit.itflow.ui.util.userMessage
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -57,7 +58,7 @@ fun ContractDetailScreen(id: Int, navController: NavController) {
     ) { padding ->
         when {
             state == null -> LoadingScreen()
-            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+            state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Error", onRetry = ::load)
             else -> {
                 val c = state!!.getOrThrow()
                 LazyColumn(

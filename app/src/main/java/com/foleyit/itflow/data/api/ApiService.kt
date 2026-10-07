@@ -116,6 +116,8 @@ interface ApiService {
     ): TicketsResponse
 
     // Ticket live chat
+    // Polled every 1.5 s: a cached copy would hide new messages (and our own just-sent one) for minutes.
+    @Headers("Cache-Control: no-store")
     @GET("tickets/{id}/chat")
     suspend fun getChatMessages(@Path("id") id: Int, @Query("since_id") sinceId: Int = 0): ChatMessagesResponse
 

@@ -1,6 +1,13 @@
 package com.foleyit.itflow.ui.screens.scan
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.app.ActivityCompat
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.media.AudioManager
@@ -37,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.ui.navigation.Screen
@@ -80,9 +89,29 @@ fun ScanBarcodeScreen(navController: NavController) {
     val toneGenerator = remember { runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90) }.getOrNull() }
     DisposableEffect(Unit) { onDispose { toneGenerator?.release() } }
 
+    // Once the user has denied twice (or ticked "don't ask again") the system dialog no longer
+    // appears, so the button has to send them to the app's settings page instead.
+    var permissionBlocked by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> hasCameraPermission = granted }
+    ) { granted ->
+        hasCameraPermission = granted
+        val activity = context.findActivity()
+        permissionBlocked = !granted && activity != null &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+    }
+
+    // Pick up a grant made in system settings when the user comes back.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
@@ -191,8 +220,20 @@ fun ScanBarcodeScreen(navController: NavController) {
                         Text("Camera access is needed to scan asset barcodes.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(24.dp))
-                        Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                            Text("Grant Permission")
+                        if (permissionBlocked) {
+                            Text("Camera access was denied. Turn it on in the app's settings.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.fromParts("package", context.packageName, null))
+                                )
+                            }) { Text("Open Settings") }
+                        } else {
+                            Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                                Text("Grant Permission")
+                            }
                         }
                     }
                 }
@@ -334,4 +375,10 @@ private fun rotateYuvPlane(data: ByteArray, width: Int, height: Int, rotationDeg
         }
         else -> Triple(data, width, height) // defensive fallback; CameraX never reports other values
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

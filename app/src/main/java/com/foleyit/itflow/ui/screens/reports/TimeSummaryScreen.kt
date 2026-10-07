@@ -1,6 +1,7 @@
 package com.foleyit.itflow.ui.screens.reports
 
 import androidx.compose.foundation.layout.*
+import com.foleyit.itflow.ui.util.userMessage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -64,7 +65,7 @@ fun TimeSummaryScreen(navController: NavController) {
 
             when {
                 state == null -> LoadingScreen()
-                state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "Error", onRetry = ::load)
+                state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "Error", onRetry = ::load)
                 else -> {
                     val report = state!!.getOrThrow()
                     LazyColumn(

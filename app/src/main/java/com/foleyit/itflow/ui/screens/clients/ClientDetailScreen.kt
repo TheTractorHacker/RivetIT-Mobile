@@ -1,6 +1,8 @@
 package com.foleyit.itflow.ui.screens.clients
 
+import com.foleyit.itflow.ui.util.avatarInitial
 import android.content.Intent
+import com.foleyit.itflow.ui.util.userMessage
 import android.net.Uri
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -57,7 +59,7 @@ fun ClientDetailScreen(id: Int, navController: NavController) {
     ) { padding ->
         when {
             clientState == null -> LoadingScreen()
-            clientState!!.isFailure -> ErrorScreen(clientState!!.exceptionOrNull()?.message ?: "", onRetry = ::loadClient)
+            clientState!!.isFailure -> ErrorScreen(clientState!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::loadClient)
             else -> {
                 val client = clientState!!.getOrThrow()
                 Column(Modifier.fillMaxSize().padding(padding)) {
@@ -68,7 +70,7 @@ fun ClientDetailScreen(id: Int, navController: NavController) {
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.size(56.dp)) {
                                 Box(contentAlignment = Alignment.Center) {
-                                    Text(client.name.first().uppercaseChar().toString(),
+                                    Text(avatarInitial(client.name),
                                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 }
@@ -196,7 +198,7 @@ private fun ClientTicketsTab(clientId: Int, navController: NavController) {
     LaunchedEffect(Unit) { load() }
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val tickets = state!!.getOrThrow()
             if (tickets.isEmpty()) { EmptyScreen("No tickets", Icons.Outlined.ConfirmationNumber); return }
@@ -266,7 +268,7 @@ private fun ClientAssetsTab(clientId: Int, navController: NavController) {
     LaunchedEffect(Unit) { load() }
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val assets = state!!.getOrThrow()
             if (assets.isEmpty()) { EmptyScreen("No assets", Icons.Outlined.Devices); return }
@@ -299,7 +301,7 @@ private fun ClientLocationsTab(clientId: Int, context: android.content.Context) 
     LaunchedEffect(Unit) { load() }
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val locs = state!!.getOrThrow()
             if (locs.isEmpty()) { EmptyScreen("No locations", Icons.Outlined.LocationOn); return }
@@ -386,7 +388,7 @@ private fun ClientCredentialsTab(clientId: Int, navController: NavController) {
     // Only reaches here after biometric success
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val creds = state!!.getOrThrow()
             if (creds.isEmpty()) { EmptyScreen("No credentials", Icons.Outlined.Lock); return }
@@ -415,7 +417,7 @@ private fun ClientContractsTab(clientId: Int, navController: NavController) {
     LaunchedEffect(Unit) { load() }
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val contracts = state!!.getOrThrow()
             if (contracts.isEmpty()) { EmptyScreen("No contracts", Icons.Outlined.Description); return }
@@ -447,7 +449,7 @@ private fun ClientFilesTab(clientId: Int, navController: NavController) {
     LaunchedEffect(Unit) { load() }
     when {
         state == null -> LoadingScreen()
-        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.message ?: "", onRetry = ::load)
+        state!!.isFailure -> ErrorScreen(state!!.exceptionOrNull()?.let { userMessage(it) } ?: "", onRetry = ::load)
         else -> {
             val files = state!!.getOrThrow()
             if (files.isEmpty()) { EmptyScreen("No signed forms yet", Icons.Outlined.Description); return }

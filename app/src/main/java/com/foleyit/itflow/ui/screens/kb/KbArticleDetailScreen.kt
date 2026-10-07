@@ -1,5 +1,6 @@
 package com.foleyit.itflow.ui.screens.kb
 
+import com.foleyit.itflow.ui.util.userMessage
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -55,7 +56,7 @@ fun KbArticleDetailScreen(id: Int, navController: NavController) {
                 },
                 onFailure = {
                     Box(Modifier.fillMaxSize().padding(padding)) {
-                        ErrorScreen(it.message ?: "Failed to load article") {
+                        ErrorScreen(userMessage(it)) {
                             scope.launch { state = runCatching { ApiClient.service().getKbArticle(id) } }
                         }
                     }
