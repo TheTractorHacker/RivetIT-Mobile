@@ -1,0 +1,63 @@
+# Generates RivetIT.xcodeproj:  brew install xcodegen && xcodegen generate
+name: RivetIT
+options:
+  bundleIdPrefix: com.foleyit
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+packages:
+  RivetCore:
+    path: .
+targets:
+  RivetIT:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - package: RivetCore
+        product: RivetCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: RivetIT
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: com.foleyit.itflow.ios
+            CFBundleURLSchemes: [rivetit]
+        NSFaceIDUsageDescription: RivetIT uses Face ID to unlock the app and to show stored credentials.
+        NSCameraUsageDescription: RivetIT uses the camera to scan asset barcodes and QR codes.
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.foleyit.itflow.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+schemes:
+  RivetIT:
+    build:
+      targets:
+        RivetIT: all
+    run:
+      config: Debug
