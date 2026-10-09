@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the two temp folders used for ticket attachments (downloads to open, camera captures to upload). -->
+<paths>
+    <cache-path name="attachments" path="attachments/" />
+    <cache-path name="camera" path="camera/" />
+</paths>

@@ -21,7 +21,7 @@ Captured on a Pixel 7 (Android 36) against a demo server with fictional data.
 
 ## Features
 
-Tickets, public replies and internal notes, live chat, appointments, assets and barcode scanning, departments, credentials, projects, contracts, worksheets, knowledge base, alerts, notifications, search, reports, and optional billing modules.
+Tickets, public replies and internal notes, live chat, appointments, assets and barcode scanning, departments, credentials, projects, contracts, worksheets, knowledge base, alerts, notifications, search, reports, and optional billing modules. Approvals, service requests, workflow tasks and ticket attachments are described in [docs/mobile-features.md](docs/mobile-features.md).
 
 ## Install and setup
 

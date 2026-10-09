@@ -100,11 +100,30 @@ fun TicketsScreen(navController: NavController) {
     Scaffold(
         floatingActionButton = {
             if (com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)) {
-            FloatingActionButton(
-                onClick = { navController.navigate(Screen.CreateTicket.route) },
-                modifier = Modifier.pressScale(0.90f),
-            ) {
-                Icon(Icons.Outlined.Add, "New Ticket")
+            // With service requests available the FAB opens a small create menu; otherwise it creates a ticket directly.
+            val canRequest = com.foleyit.itflow.data.LocalCapabilities.current.canRequest()
+            var createMenu by remember { mutableStateOf(false) }
+            Box {
+                FloatingActionButton(
+                    onClick = { if (canRequest) createMenu = true else navController.navigate(Screen.CreateTicket.route) },
+                    modifier = Modifier.pressScale(0.90f),
+                ) {
+                    Icon(Icons.Outlined.Add, androidx.compose.ui.res.stringResource(
+                        if (canRequest) com.foleyit.itflow.R.string.fab_create_menu else com.foleyit.itflow.R.string.fab_new_ticket
+                    ))
+                }
+                DropdownMenu(expanded = createMenu, onDismissRequest = { createMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.fab_new_ticket)) },
+                        leadingIcon = { Icon(Icons.Outlined.ConfirmationNumber, null) },
+                        onClick = { createMenu = false; navController.navigate(Screen.CreateTicket.route) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_new_request)) },
+                        leadingIcon = { Icon(Icons.Outlined.AddTask, null) },
+                        onClick = { createMenu = false; navController.navigate(Screen.Requests.route) },
+                    )
+                }
             }
             }
         }

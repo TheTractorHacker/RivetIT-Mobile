@@ -1,6 +1,9 @@
 package com.foleyit.itflow.data.api
 
+import com.google.gson.JsonObject
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.*
 
 interface ApiService {
@@ -363,6 +366,46 @@ interface ApiService {
 
     @POST("alerts")
     suspend fun actOnAlert(@Body body: AlertActionRequest)
+
+    // ── Approvals, service requests, workflow tasks, ticket attachments ──────────────────────────────
+    // Responses are read as raw JSON and mapped by FeatureParsers, which tolerates nulls and unknown keys.
+    // Personal or per-user data is requested with no-store so it is never written to the disk cache.
+
+    @GET("approvals.php")
+    @Headers("Cache-Control: no-store")
+    suspend fun getApprovals(): JsonObject
+
+    @POST("approvals.php")
+    suspend fun decideApproval(@Body body: JsonObject): JsonObject
+
+    @GET("service_catalog.php")
+    suspend fun getServiceCatalog(): JsonObject
+
+    @POST("service_catalog.php")
+    suspend fun submitCatalogRequest(@Body body: JsonObject): JsonObject
+
+    @GET("workflow_tasks.php")
+    @Headers("Cache-Control: no-store")
+    suspend fun getWorkflowTasks(@Query("scope") scope: String = "mine"): JsonObject
+
+    @POST("workflow_tasks.php")
+    suspend fun actOnWorkflowTask(@Body body: JsonObject): JsonObject
+
+    @GET("ticket_attachments.php")
+    @Headers("Cache-Control: no-store")
+    suspend fun getTicketAttachments(@Query("ticket_id") ticketId: Int): JsonObject
+
+    @Streaming
+    @GET("ticket_attachments.php")
+    @Headers("Cache-Control: no-store")
+    suspend fun downloadTicketAttachment(@Query("id") id: Int, @Query("download") download: Int = 1): ResponseBody
+
+    @Multipart
+    @POST("ticket_attachments.php")
+    suspend fun uploadTicketAttachment(
+        @Part("ticket_id") ticketId: RequestBody,
+        @Part file: MultipartBody.Part,
+    ): JsonObject
 }
 
 // Extension helpers

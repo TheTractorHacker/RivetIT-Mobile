@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -136,6 +138,8 @@ fun AppDrawerContent(
     onNavigate: (String) -> Unit,
     onSignOut: () -> Unit,
     capabilities: com.foleyit.itflow.data.Capabilities = com.foleyit.itflow.data.Capabilities.Unrestricted,
+    approvalsCount: Int = 0,
+    overdueTasks: Int = 0,
 ) {
     ModalDrawerSheet(modifier = Modifier.width(272.dp).fillMaxHeight()) {
         Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
@@ -186,6 +190,37 @@ fun AppDrawerContent(
                 icon = { DrawerLeadingIcon(Icons.Outlined.Notifications, hasUnreadNotifications) },
                 selected = false, onClick = { onNavigate(Screen.Notifications.route) }, modifier = DrawerItemPadding,
             )
+            if (capabilities.canUseApprovals()) {
+                val badgeDesc = androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_approvals_badge, approvalsCount)
+                NavigationDrawerItem(
+                    label = { Text(androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_approvals)) },
+                    icon = { DrawerLeadingIcon(Icons.Outlined.HowToReg) },
+                    badge = if (approvalsCount > 0) ({
+                        Badge(Modifier.semantics { contentDescription = badgeDesc }) { Text(approvalsCount.toString()) }
+                    }) else null,
+                    selected = false, onClick = { onNavigate(Screen.Approvals.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canRequest()) {
+                NavigationDrawerItem(
+                    label = { Text(androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_new_request)) },
+                    icon = { DrawerLeadingIcon(Icons.Outlined.AddTask) },
+                    selected = false, onClick = { onNavigate(Screen.Requests.route) }, modifier = DrawerItemPadding,
+                )
+            }
+            if (capabilities.canUseTasks()) {
+                val badgeDesc = androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_tasks_badge, overdueTasks)
+                NavigationDrawerItem(
+                    label = { Text(androidx.compose.ui.res.stringResource(com.foleyit.itflow.R.string.nav_my_tasks)) },
+                    icon = { DrawerLeadingIcon(Icons.Outlined.Checklist) },
+                    badge = if (overdueTasks > 0) ({
+                        Badge(containerColor = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { contentDescription = badgeDesc }) {
+                            Text(overdueTasks.toString())
+                        }
+                    }) else null,
+                    selected = false, onClick = { onNavigate(Screen.MyTasks.route) }, modifier = DrawerItemPadding,
+                )
+            }
             if (capabilities.canView(com.foleyit.itflow.data.Capabilities.RMM_ALERTS)) {
                 NavigationDrawerItem(
                     label = { Text("Alerts") }, icon = { DrawerLeadingIcon(Icons.Outlined.Warning) },
