@@ -1,0 +1,116 @@
+name: iOS
+
+on:
+  push:
+    branches: [main, beta, ios-app]
+    tags: ['v*', 'ios-v*']
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # attach the packages to a GitHub Release on tags
+
+jobs:
+  core-linux:
+    name: RivetCore tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:5.10-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit tests
+        working-directory: ios
+        run: swift test
+
+  app-macos:
+    name: Build app and run core tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run RivetCore tests on macOS
+        working-directory: ios
+        run: swift test
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build the app for the iOS Simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Launch in the simulator and take a screenshot
+        # Informational: proves the app starts (first-run server-setup screen), not just that it compiles.
+        continue-on-error: true
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 16' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+          xcrun simctl boot "iPhone 16" || true
+          xcrun simctl bootstatus "iPhone 16" -b
+          xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/RivetIT.app
+          xcrun simctl launch booted com.foleyit.itflow.ios
+          sleep 10
+          xcrun simctl io booted screenshot first-launch.png
+      - name: Upload the screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-first-launch
+          path: ios/first-launch.png
+          if-no-files-found: ignore
+
+  package:
+    name: Package (unsigned .ipa + simulator .app)
+    runs-on: macos-15
+    needs: app-macos
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Determine version
+        id: version
+        working-directory: ios
+        run: echo "name=$(grep -E 'MARKETING_VERSION' project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
+      - name: Build the device app (unsigned)
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Build the simulator app
+        working-directory: ios
+        run: |
+          xcodebuild -project RivetIT.xcodeproj -scheme RivetIT -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Assemble the packages
+        working-directory: ios
+        run: |
+          set -e
+          V="${{ steps.version.outputs.name }}"
+          mkdir -p dist Payload
+          cp -R build-device/Build/Products/Release-iphoneos/RivetIT.app Payload/
+          zip -qry "dist/RivetIT-${V}-unsigned.ipa" Payload
+          ditto -c -k --sequesterRsrc --keepParent \
+            build-sim/Build/Products/Release-iphonesimulator/RivetIT.app "dist/RivetIT-${V}-simulator.app.zip"
+          ls -l dist
+      - name: Upload the packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: rivetit-ios-${{ steps.version.outputs.name }}
+          path: ios/dist/*
+          retention-days: 30
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ios/dist/*
+          generate_release_notes: true
