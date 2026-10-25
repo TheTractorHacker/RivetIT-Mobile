@@ -223,7 +223,7 @@ fun MainScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             BrandMark(size = 28.dp)
                             Spacer(Modifier.width(10.dp))
-                            Text("RivetIT", style = MaterialTheme.typography.titleLarge)
+                            Text(com.foleyit.itflow.ui.branding.LocalCompanyBranding.current.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
                     },
                     actions = {
