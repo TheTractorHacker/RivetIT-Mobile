@@ -127,7 +127,22 @@ class MainActivity : FragmentActivity() {
             val resolvedStart = startDestination ?: return@setContent
             val themeMode by prefs.themeMode.collectAsState(initial = com.foleyit.itflow.ui.theme.ThemeMode.SYSTEM)
             val colorSeed by prefs.colorSeed.collectAsState(initial = com.foleyit.itflow.ui.theme.ColorSeed.DEFAULT.id)
+            // System bar icons must follow the app's own theme choice, not just the phone's, or a Dark-mode app
+            // on a light phone gets dark-on-dark (invisible) clock and battery.
+            val darkTheme = when (themeMode) {
+                com.foleyit.itflow.ui.theme.ThemeMode.LIGHT -> false
+                com.foleyit.itflow.ui.theme.ThemeMode.DARK -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+            DisposableEffect(darkTheme) {
+                val barStyle = androidx.activity.SystemBarStyle.auto(
+                    android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT
+                ) { darkTheme }
+                enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+                onDispose {}
+            }
             ITFlowTheme(themeMode = themeMode, colorSeed = colorSeed) {
+              com.foleyit.itflow.ui.branding.CompanyBrandingProvider(prefs) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     var isLocked by remember { mutableStateOf(startLocked) }
@@ -226,6 +241,7 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 }
+              }
             }
         }
     }

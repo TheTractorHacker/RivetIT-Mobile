@@ -32,7 +32,6 @@ import com.foleyit.itflow.data.local.AppPreferences
 import com.foleyit.itflow.data.ssl.FingerprintTrustManager
 import com.foleyit.itflow.data.ssl.probeCertificate
 import com.foleyit.itflow.data.ssl.sha256Fingerprint
-import com.foleyit.itflow.ui.components.RivetItLogoMark
 import com.foleyit.itflow.ui.util.userMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -208,22 +207,7 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
     ) {
         Spacer(Modifier.height(64.dp))
 
-        val logoTileGradient = Brush.linearGradient(
-            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.inversePrimary),
-            start = Offset.Zero,
-            end = Offset.Infinite
-        )
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(logoTileGradient, MaterialTheme.shapes.extraLarge),
-            contentAlignment = Alignment.Center
-        ) {
-            RivetItLogoMark(
-                modifier = Modifier.size(40.dp),
-                markColor = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
+        com.foleyit.itflow.ui.components.BrandMark(72.dp)
         Spacer(Modifier.height(24.dp))
         Text("Connect to RivetIT", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))

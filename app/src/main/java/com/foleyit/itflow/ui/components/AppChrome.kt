@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.foleyit.itflow.ui.navigation.BottomNavItem
@@ -72,6 +73,23 @@ val BrandTileShape: RoundedCornerShape = RoundedCornerShape(
 /** Gradient brand tile (primary -> inversePrimary, 135deg) containing the [RivetItLogoMark]. */
 @Composable
 fun BrandMark(size: Dp, modifier: Modifier = Modifier) {
+    // The connected server's uploaded company logo replaces the product mark; no logo (or an older server)
+    // keeps the RivetIT tile below. While the cached identity loads we draw nothing, never the wrong brand.
+    val brand = com.foleyit.itflow.ui.branding.LocalCompanyBranding.current
+    if (brand.loading) { Box(modifier.size(size)); return }
+    brand.bitmap?.let { logo ->
+        Box(
+            modifier.height(size).widthIn(max = size * 2.6f)
+                .clip(RoundedCornerShape(size * 0.26f)).background(Color.White).padding(size * 0.08f),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.Image(
+                logo.asImageBitmap(), brand.name, Modifier.fillMaxHeight(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+        }
+        return
+    }
     Box(
         modifier
             .size(size)
@@ -272,6 +290,7 @@ fun FloatingBottomNavBar(
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     Surface(
         modifier = Modifier
+            .navigationBarsPadding() // keep the pill (and its labels) clear of the gesture handle
             .widthIn(max = 600.dp)
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 10.dp)
