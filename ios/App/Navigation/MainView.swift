@@ -108,7 +108,7 @@ import RivetCore
                             Image(systemName: "line.3.horizontal")
                         }.accessibilityLabel("Menu")
                         BrandMark(size: 28)
-                        Text("RivetIT").font(.title3.weight(.medium)).foregroundColor(Palette.label)
+                        Text(session.branding.name).font(.title3.weight(.medium)).foregroundColor(Palette.label).lineLimit(1)
                     }
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {

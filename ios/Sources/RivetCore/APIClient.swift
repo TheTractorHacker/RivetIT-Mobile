@@ -20,7 +20,7 @@ public final class APIClient: @unchecked Sendable {
     public let serverURL: URL
     public var token: String?
     public var onUnauthorized: (@Sendable () -> Void)?
-    private let transport: HTTPTransport
+    let transport: HTTPTransport
 
     public init(serverURL: URL, token: String? = nil, transport: HTTPTransport) {
         self.serverURL = serverURL

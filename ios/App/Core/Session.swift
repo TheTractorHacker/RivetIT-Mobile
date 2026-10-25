@@ -47,6 +47,8 @@ final class Session: ObservableObject {
     @Published private(set) var profile: UserProfile?
     @Published private(set) var capabilities: Capabilities = .unrestricted
     @Published var hasUnread = false
+    /// Company name and logo published by the connected server (`/api/v1/branding`), cached per server.
+    @Published private(set) var branding = BrandingState(loading: false)
     @Published var notice: String?
     /// A `rivetit://…` link received before the user was signed in; followed once the main screen is showing.
     @Published var pendingDeepLink: String?
@@ -76,6 +78,10 @@ final class Session: ObservableObject {
             buildClient(token: Keychain.get(Keys.token))
             phase = api?.token == nil ? .login : .main
             if phase == .main { Task { await refreshProfile() } }
+            restoreCachedBranding()
+            Task { await loadBranding() }
+        } else {
+            branding = BrandingState()
         }
     }
 
@@ -110,6 +116,8 @@ final class Session: ObservableObject {
         trustedFingerprint = fingerprint
         buildClient(token: nil)
         phase = .login
+        restoreCachedBranding()
+        Task { await loadBranding() }
         return .connected
     }
 
@@ -143,7 +151,44 @@ final class Session: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Keys.server)
         UserDefaults.standard.removeObject(forKey: Keys.fingerprint)
         serverURL = nil; trustedFingerprint = nil; api = nil
+        branding = BrandingState()
         phase = .setup
+    }
+
+    // MARK: Company branding
+
+    private var brandingCacheKey: String { "branding." + (serverURL?.absoluteString ?? "") }
+    private var logoCacheFile: URL? {
+        guard let serverURL else { return nil }
+        let name = serverURL.absoluteString.unicodeScalars.map { String(format: "%02x", $0.value) }.joined().prefix(64)
+        return FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("company_logo_\(name)")
+    }
+
+    /// Shows the last known name/logo for this server immediately, before the network answers.
+    private func restoreCachedBranding() {
+        guard serverURL != nil else { return }
+        let name = UserDefaults.standard.string(forKey: brandingCacheKey)
+        let logo = logoCacheFile.flatMap { try? Data(contentsOf: $0) }.flatMap(UIImage.init(data:))
+        branding = BrandingState(name: name ?? "RivetIT", logo: logo, loading: false)
+    }
+
+    /// Fetches the company identity with a credential-free client (no token), then caches it. A server that has
+    /// no branding endpoint (older version) or is unreachable keeps whatever was cached, else the generic mark.
+    func loadBranding() async {
+        guard let serverURL else { return }
+        let client = APIClient(serverURL: serverURL, token: nil, transport: PinnedTransport(pinnedFingerprint: trustedFingerprint))
+        guard let info = try? await client.branding(), self.serverURL == serverURL else { return }
+        var logo: UIImage?
+        if let data = await client.companyLogoData(path: info.logoPath, server: serverURL), let image = UIImage(data: data) {
+            logo = image
+            if let file = logoCacheFile { try? data.write(to: file) }
+        } else if let file = logoCacheFile {
+            try? FileManager.default.removeItem(at: file)
+        }
+        UserDefaults.standard.set(info.name, forKey: brandingCacheKey)
+        guard self.serverURL == serverURL else { return }
+        branding = BrandingState(name: info.name.isEmpty ? "RivetIT" : info.name, logo: logo, loading: false)
     }
 
     func refreshProfile() async {

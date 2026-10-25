@@ -10,6 +10,7 @@ struct RivetITApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(session)
+                .environment(\.companyBranding, session.branding)
                 .tint(Palette.brand)
         }
     }
@@ -50,6 +51,7 @@ struct RivetITApp: App {
             switch phase {
             case .background: backgroundedAt = Date()
             case .active:
+                Task { await session.loadBranding() }
                 if session.biometricLock, session.phase == .main, let t = backgroundedAt, Date().timeIntervalSince(t) > 300 { locked = true }
                 backgroundedAt = nil
             default: break

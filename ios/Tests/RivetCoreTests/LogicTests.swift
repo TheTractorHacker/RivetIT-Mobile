@@ -141,3 +141,33 @@ final class CertificateTests: XCTestCase {
         XCTAssertEqual(s.fingerprint.count, 95)
     }
 }
+
+final class CompanyLogoTests: XCTestCase {
+    private let server = URL(string: "https://rivet.example.com")!
+
+    func testResolvesUploadedLogoOnTheSameServer() {
+        XCTAssertEqual(CompanyLogo.url(server: server, path: "/uploads/settings/logo.png")?.absoluteString,
+                       "https://rivet.example.com/uploads/settings/logo.png")
+    }
+    func testNoLogoMeansNoURL() {
+        XCTAssertNil(CompanyLogo.url(server: server, path: nil))
+        XCTAssertNil(CompanyLogo.url(server: server, path: ""))
+    }
+    func testRefusesAnotherHost() {
+        XCTAssertNil(CompanyLogo.url(server: server, path: "https://evil.example.net/uploads/settings/logo.png"))
+        XCTAssertNil(CompanyLogo.url(server: server, path: "//evil.example.net/uploads/settings/logo.png"))
+    }
+    func testRefusesOtherPortsAndPathsOutsideTheSettingsFolder() {
+        XCTAssertNil(CompanyLogo.url(server: server, path: "https://rivet.example.com:8443/uploads/settings/logo.png"))
+        XCTAssertNil(CompanyLogo.url(server: server, path: "/api/v1/me"))
+        XCTAssertNil(CompanyLogo.url(server: server, path: "/uploads/settings/../../api/v1/me"))
+    }
+    func testDecodesTheBrandingResponse() throws {
+        let b = try APIClient.decoder.decode(CompanyBranding.self,
+            from: Data(#"{"name":"Summit Ridge Manufacturing","logo_path":"\/uploads\/settings\/a.png"}"#.utf8))
+        XCTAssertEqual(b.name, "Summit Ridge Manufacturing")
+        XCTAssertEqual(b.logoPath, "/uploads/settings/a.png")
+        let none = try APIClient.decoder.decode(CompanyBranding.self, from: Data(#"{"name":"X","logo_path":null}"#.utf8))
+        XCTAssertNil(none.logoPath)
+    }
+}

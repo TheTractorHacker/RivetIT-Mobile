@@ -3,14 +3,45 @@ import RivetCore
 
 // MARK: Brand
 
+/// What the connected server says about the company: name, and the uploaded logo once downloaded.
+struct BrandingState: Equatable {
+    var name = "RivetIT"
+    var logo: UIImage?
+    /// True until the cached or fetched identity is known, so the previous company's mark is never flashed.
+    var loading = false
+}
+
+private struct BrandingKey: EnvironmentKey { static let defaultValue = BrandingState() }
+extension EnvironmentValues {
+    var companyBranding: BrandingState {
+        get { self[BrandingKey.self] }
+        set { self[BrandingKey.self] = newValue }
+    }
+}
+
+/// The company's own mark: its uploaded logo, or a tile with the company's initial in the brand color.
 @MainActor struct BrandMark: View {
     var size: CGFloat = 28
+    @Environment(\.companyBranding) private var brand
+
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).fill(Palette.brandGradient)
-            Text("R").font(.system(size: size * 0.58, weight: .heavy)).foregroundColor(.white)
+        Group {
+            if brand.loading {
+                Color.clear.frame(width: size, height: size)
+            } else if let logo = brand.logo {
+                Image(uiImage: logo).resizable().scaledToFit()
+                    .padding(size * 0.08)
+                    .frame(maxWidth: size * 2.6, maxHeight: size)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous))
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).fill(Palette.brandGradient)
+                    Text(String(brand.name.trimmingCharacters(in: .whitespaces).first ?? "R").uppercased())
+                        .font(.system(size: size * 0.58, weight: .heavy)).foregroundColor(.white)
+                }
+                .frame(width: size, height: size)
+            }
         }
-        .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }
