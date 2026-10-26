@@ -21,7 +21,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -323,7 +322,6 @@ fun OuttakeSignScreen(outtakeId: Int, navController: NavController) {
                                     }
 
                                     Spacer(Modifier.height(16.dp))
-                                    val uriHandler = LocalUriHandler.current
                                     Surface(
                                         color = MaterialTheme.colorScheme.surfaceContainerHighest,
                                         shape = MaterialTheme.shapes.medium,
@@ -334,13 +332,7 @@ fun OuttakeSignScreen(outtakeId: Int, navController: NavController) {
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                         ) {
                                             Checkbox(checked = termsAgreed, onCheckedChange = { termsAgreed = it })
-                                            Text("I agree to the", style = MaterialTheme.typography.bodySmall)
-                                            TextButton(
-                                                onClick = { uriHandler.openUri("https://foleyit.com/ticket-terms") },
-                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                                            ) {
-                                                Text("Terms & Conditions", style = MaterialTheme.typography.bodySmall)
-                                            }
+                                            Text("I agree to the Terms & Conditions", style = MaterialTheme.typography.bodySmall)
                                         }
                                     }
                                 }
