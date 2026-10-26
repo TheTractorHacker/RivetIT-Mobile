@@ -90,7 +90,7 @@ private val TealDark = darkColorScheme(
     surfaceContainer = Color(0xFF212425), surfaceContainerHigh = Color(0xFF2B2F30), surfaceContainerHighest = Color(0xFF363A3B),
 )
 
-// FoleyIT — optional blue/cyan/green palette.
+// Optional blue/cyan/green palette (persisted id "foleyit" kept for existing installs).
 private val FoleyitLight = lightColorScheme(
     primary = Color(0xFF0066CC), onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFC4E1FF), onPrimaryContainer = Color(0xFF05162C),
