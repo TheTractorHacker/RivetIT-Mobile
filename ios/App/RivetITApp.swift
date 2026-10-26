@@ -63,11 +63,12 @@ struct RivetITApp: App {
 @MainActor struct LockView: View {
     var unlocked: () -> Void
     @State private var message: String?
+    @Environment(\.companyBranding) private var brand
 
     var body: some View {
         VStack(spacing: 18) {
             BrandMark(size: 72)
-            Text("RivetIT is locked").font(.title2.weight(.semibold))
+            Text("\(brand.name) is locked").font(.title2.weight(.semibold))
             Text("Verify your identity to continue").foregroundColor(Palette.label2)
             Button { authenticate() } label: { Label("Unlock", systemImage: "faceid") }
                 .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 240)

@@ -36,6 +36,18 @@ private fun decodeLogo(bytes: ByteArray): Bitmap? {
         BitmapFactory.Options().apply { inSampleSize = sample })
 }
 
+/** Last company name seen, readable without Compose (notifications, widget, lock screen). */
+object CompanyNameStore {
+    private const val PREFS = "company_branding"
+    fun last(context: android.content.Context): String? =
+        context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .getString("name", null)?.takeIf { it.isNotBlank() }
+    fun remember(context: android.content.Context, name: String) {
+        context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString("name", name).apply()
+    }
+}
+
 /** Loads cached public branding, then refreshes without changing API auth or server identity. */
 internal class CompanyBrandingRepository(private val context: android.content.Context) {
     suspend fun load(server: String, certificate: String?, emit: (CompanyBranding) -> Unit) {
@@ -48,7 +60,7 @@ internal class CompanyBrandingRepository(private val context: android.content.Co
             runCatching {
                 val data = JSONObject(metadata.readText())
                 CompanyBranding(data.optString("name", "RivetIT"),
-                    data.optString("logo_path").isNotBlank(),
+                    data.optString("logo_path").isNotBlank(), true,
                     if (image.exists()) decodeLogo(image.readBytes()) else null)
             }.getOrNull()
         }
@@ -88,12 +100,14 @@ internal class CompanyBrandingRepository(private val context: android.content.Co
                 if (bitmap != null) image.writeBytes(checkNotNull(bytes))
                 else if (path.isBlank() || previousPath != path) image.delete()
                 metadata.writeText(JSONObject().put("name", name).put("logo_path", path).toString())
-                CompanyBranding(name, path.isNotBlank(), effectiveBitmap)
+                CompanyNameStore.remember(context, name)
+                CompanyBranding(name, path.isNotBlank(), true, effectiveBitmap)
             }.getOrNull()
         }
         emit(refreshed ?: cached ?: CompanyBranding(
             name = server.toHttpUrlOrNull()?.host ?: "Company",
             logoConfigured = true,
+            fromServer = true,
         ))
     }
 }

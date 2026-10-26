@@ -250,6 +250,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun BiometricLockScreen(prefs: AppPreferences, onUnlocked: () -> Unit, onSignOut: () -> Unit) {
     val activity = androidx.activity.compose.LocalActivity.current as? FragmentActivity ?: return
+    val companyName = com.foleyit.itflow.ui.branding.LocalCompanyBranding.current.name
 
     fun authenticate() {
         val crypto = try { BiometricCrypto.cryptoObject() } catch (_: Exception) { return }
@@ -264,7 +265,7 @@ private fun BiometricLockScreen(prefs: AppPreferences, onUnlocked: () -> Unit, o
         })
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("RivetIT")
+                .setTitle(companyName)
                 .setSubtitle("Authenticate to continue")
                 .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .setNegativeButtonText("Sign out")
@@ -280,7 +281,7 @@ private fun BiometricLockScreen(prefs: AppPreferences, onUnlocked: () -> Unit, o
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Icon(Icons.Outlined.Fingerprint, null, Modifier.size(72.dp),
                 tint = MaterialTheme.colorScheme.primary)
-            Text("RivetIT", style = MaterialTheme.typography.headlineSmall,
+            Text(companyName, style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold)
             Text("Authentication required", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))

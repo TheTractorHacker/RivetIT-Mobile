@@ -33,7 +33,7 @@ class TicketCountWidget : GlanceAppWidget() {
             ) {
                 Column(modifier = GlanceModifier.fillMaxSize()) {
                     Text(
-                        "RivetIT",
+                        com.foleyit.itflow.ui.branding.CompanyNameStore.last(context) ?: "RivetIT",
                         style = TextStyle(
                             color = ColorProvider(Color(0xFF6650A4)),
                             fontWeight = FontWeight.Bold,
