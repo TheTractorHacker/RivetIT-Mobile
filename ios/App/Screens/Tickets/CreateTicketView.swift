@@ -9,6 +9,8 @@ import RivetCore
     @State private var priority = "low"
     @State private var department: ClientSummary?
     @State private var category: TicketCategory?
+    @State private var contact: Contact?
+    @State private var showContacts = false
     @State private var showDepartments = false
     @State private var showCategories = false
     @State private var saving = false
@@ -35,9 +37,11 @@ import RivetCore
                     TextField("Description", text: $details, axis: .vertical).lineLimit(4...8).padding(16)
                 }.background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).padding(.horizontal, 16)
 
-                SectionLabel(text: "Department · Category")
+                SectionLabel(text: "Department · Contact · Category")
                 VStack(spacing: 0) {
                     pickRow("building.2", department?.name ?? "Select department (optional)", set: department != nil) { showDepartments = true }
+                    Divider().padding(.leading, 46)
+                    pickRow("person", contact?.name ?? (department != nil ? "Primary contact (tap to search)" : "Search contacts (optional)"), set: contact != nil) { showContacts = true }
                     Divider().padding(.leading, 46)
                     pickRow("tag", category?.name ?? "Select category (optional)", set: category != nil) { showCategories = true }
                 }.background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).padding(.horizontal, 16)
@@ -58,7 +62,16 @@ import RivetCore
             }.buttonStyle(PrimaryButtonStyle()).disabled(!canCreate).padding(.horizontal, 16).padding(.vertical, 10).background(.bar)
         }
         .sheet(isPresented: $showDepartments) {
-            DepartmentPicker { department = $0; showDepartments = false }.presentationDetents([.large])
+            DepartmentPicker { picked in
+                if department?.id != picked.id { contact = nil }
+                department = picked; showDepartments = false
+            }.presentationDetents([.large])
+        }
+        .sheet(isPresented: $showContacts) {
+            ContactPicker(clientId: department?.id) { picked in
+                contact = picked
+                showContacts = false
+            }.presentationDetents([.large])
         }
         .sheet(isPresented: $showCategories) {
             CategoryPicker(selected: category) { category = $0; showCategories = false }.presentationDetents([.medium, .large])
@@ -81,7 +94,8 @@ import RivetCore
         guard let api = session.api, canCreate else { return }
         saving = true; error = nil
         let body = CreateTicketRequest(subject: subject.trimmingCharacters(in: .whitespaces), details: details,
-                                       clientId: department?.id, priority: priority, categoryId: category?.id)
+                                       clientId: department?.id, priority: priority, categoryId: category?.id,
+                                       contactId: contact?.id)
         Task {
             defer { saving = false }
             do {
@@ -132,6 +146,57 @@ import RivetCore
         guard let api = session.api else { return }
         loading = true; error = nil
         do { results = try await api.clients(search: search, page: 1).data }
+        catch { self.error = userMessage(for: error) }
+        loading = false
+    }
+}
+
+/// Searches contacts by name or email, within the chosen department when there is one.
+@MainActor struct ContactPicker: View {
+    var clientId: Int?
+    var onPick: (Contact?) -> Void
+    @EnvironmentObject var session: Session
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+    @State private var results: [Contact] = []
+    @State private var loading = true
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                SearchField(placeholder: "Search contacts…", text: $search).padding(16)
+                if let error { ErrorStateView(message: error, retry: { await load() }) }
+                else if loading && results.isEmpty { LoadingStateView() }
+                else {
+                    List {
+                        Button(clientId != nil ? "Use primary contact" : "No contact") { onPick(nil) }.foregroundColor(Palette.label2)
+                        if results.isEmpty { Text("No contacts found").foregroundColor(Palette.label2) }
+                        ForEach(results) { c in
+                            Button { onPick(c) } label: {
+                                VStack(alignment: .leading) {
+                                    Text(c.name)
+                                    if let email = c.email, !email.isEmpty { Text(email).font(.caption).foregroundColor(Palette.label2) }
+                                }
+                            }.buttonStyle(.plain)
+                        }
+                    }.listStyle(.plain)
+                }
+            }
+            .navigationTitle("Contact").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .task(id: search) {
+                if !search.isEmpty { try? await Task.sleep(nanoseconds: 300_000_000) }
+                if Task.isCancelled { return }
+                await load()
+            }
+        }
+    }
+
+    private func load() async {
+        guard let api = session.api else { return }
+        loading = true; error = nil
+        do { results = try await api.contacts(clientId: clientId, search: search).data }
         catch { self.error = userMessage(for: error) }
         loading = false
     }

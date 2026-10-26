@@ -156,6 +156,13 @@ public extension APIClient {
     }
     func sendChat(ticketId: Int, message: String) async throws { try await sendVoid("POST", "tickets/\(ticketId)/chat", body: SendChatMessageRequest(message: message)) }
 
+    // Contacts (searchable, optionally limited to one department)
+    func contacts(clientId: Int? = nil, search: String = "") async throws -> Paged<Contact> {
+        var query = ["search": search, "limit": "50"]
+        if let clientId { query["client_id"] = String(clientId) }
+        return try await get("contacts", query: query)
+    }
+
     // Departments (API name: clients)
     func clients(search: String = "", page: Int = 1) async throws -> Paged<ClientSummary> {
         try await get("clients", query: ["search": search, "page": String(page)])

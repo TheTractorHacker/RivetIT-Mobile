@@ -166,6 +166,14 @@ interface ApiService {
     @POST("tickets/{id}/time")
     suspend fun logTime(@Path("id") id: Int, @Body req: LogTimeRequest)
 
+    // Contacts (searchable, optionally limited to one department)
+    @GET("contacts")
+    suspend fun getContacts(
+        @Query("client_id") clientId: Int? = null,
+        @Query("search") search: String = "",
+        @Query("limit") limit: Int = 50
+    ): ContactsResponse
+
     // Clients
     @GET("clients")
     suspend fun getClients(
