@@ -104,10 +104,7 @@ internal class CompanyBrandingRepository(private val context: android.content.Co
                 CompanyBranding(name, path.isNotBlank(), true, effectiveBitmap)
             }.getOrNull()
         }
-        emit(refreshed ?: cached ?: CompanyBranding(
-            name = server.toHttpUrlOrNull()?.host ?: "Company",
-            logoConfigured = true,
-            fromServer = true,
-        ))
+        // Branding unavailable (older server, offline): stay generic rather than inventing a name from the host.
+        emit(refreshed ?: cached ?: CompanyBranding())
     }
 }

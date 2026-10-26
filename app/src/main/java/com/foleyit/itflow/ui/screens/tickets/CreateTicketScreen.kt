@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.ClientsResponse
+import com.foleyit.itflow.data.api.ContactsResponse
 import com.foleyit.itflow.data.api.CreateTicketRequest
 import com.foleyit.itflow.data.api.TicketCategory
 import com.foleyit.itflow.ui.components.SectionLabel
@@ -47,6 +48,12 @@ fun CreateTicketScreen(navController: NavController) {
     var selectedClientName by rememberSaveable { mutableStateOf("") }
     var clients by remember { mutableStateOf<Result<ClientsResponse>?>(null) }
     var clientSearch by remember { mutableStateOf("") }
+    var selectedContactId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedContactName by rememberSaveable { mutableStateOf("") }
+    var contacts by remember { mutableStateOf<Result<ContactsResponse>?>(null) }
+    var contactSearch by remember { mutableStateOf("") }
+    var contactLoadAttempt by remember { mutableIntStateOf(0) }
+    var showContactPicker by remember { mutableStateOf(false) }
     var clientLoadAttempt by remember { mutableIntStateOf(0) }
     var showClientPicker by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf<Result<List<TicketCategory>>?>(null) }
@@ -59,7 +66,7 @@ fun CreateTicketScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val hasDraft = subject.isNotBlank() || details.isNotBlank() || priority != "low" ||
-        selectedClientId != null || selectedCategoryId != null
+        selectedClientId != null || selectedCategoryId != null || selectedContactId != null
 
     fun goBack() {
         if (saving) return
@@ -79,6 +86,15 @@ fun CreateTicketScreen(navController: NavController) {
             },
             dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text("Keep editing") } }
         )
+    }
+
+    LaunchedEffect(showContactPicker, contactSearch, contactLoadAttempt, selectedClientId) {
+        if (!showContactPicker) return@LaunchedEffect
+        contacts = null
+        if (contactSearch.isNotBlank()) delay(250)
+        contacts = try {
+            Result.success(ApiClient.service().getContacts(clientId = selectedClientId, search = contactSearch.trim()))
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
     }
 
     LaunchedEffect(showClientPicker, clientSearch, clientLoadAttempt) {
@@ -120,7 +136,8 @@ fun CreateTicketScreen(navController: NavController) {
                         details = details.trim(),
                         clientId = selectedClientId,
                         priority = priority,
-                        categoryId = selectedCategoryId
+                        categoryId = selectedCategoryId,
+                        contactId = selectedContactId
                     )
                 )
                 val ticketId = created["id"]?.takeIf { it > 0 }
@@ -151,7 +168,7 @@ fun CreateTicketScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Spacer(Modifier.height(8.dp))
-                Surface(onClick = { selectedClientId = null; selectedClientName = ""; showClientPicker = false },
+                Surface(onClick = { selectedClientId = null; selectedClientName = ""; selectedContactId = null; selectedContactName = ""; showClientPicker = false },
                     modifier = Modifier.fillMaxWidth()) {
                     Text("— No Department —", Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.outline)
@@ -170,6 +187,7 @@ fun CreateTicketScreen(navController: NavController) {
                         LazyColumn(Modifier.heightIn(max = 480.dp)) {
                             items(response.data, key = { it.id }) { c ->
                                 Surface(onClick = {
+                                    if (selectedClientId != c.id) { selectedContactId = null; selectedContactName = "" }
                                     selectedClientId = c.id; selectedClientName = c.name; showClientPicker = false
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Text(c.name, Modifier.padding(16.dp))
@@ -179,6 +197,69 @@ fun CreateTicketScreen(navController: NavController) {
                         }
                         if (response.total > response.data.size) {
                             Text("Search by name to find more departments.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showContactPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showContactPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(Modifier.heightIn(max = 600.dp).padding(16.dp).navigationBarsPadding()) {
+                Text("Select Contact", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = contactSearch, onValueChange = { contactSearch = it },
+                    label = { Text("Search contacts") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(onClick = { selectedContactId = null; selectedContactName = ""; showContactPicker = false },
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text(if (selectedClientId != null) "— Use primary contact —" else "— No Contact —",
+                        Modifier.padding(16.dp), color = MaterialTheme.colorScheme.outline)
+                }
+                HorizontalDivider()
+                when {
+                    contacts == null -> CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp))
+                    contacts!!.isFailure -> {
+                        Text("Could not load contacts: ${userMessage(contacts!!.exceptionOrNull()!!)}",
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { contacts = null; contactLoadAttempt++ }) { Text("Retry") }
+                    }
+                    else -> {
+                        val response = contacts!!.getOrThrow()
+                        if (response.data.isEmpty()) Text("No contacts found", Modifier.padding(16.dp))
+                        LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                            items(response.data, key = { it.id }) { c ->
+                                Surface(onClick = {
+                                    selectedContactId = c.id; selectedContactName = c.name; showContactPicker = false
+                                    // Picking a contact from an unfiltered search also fills in their department.
+                                    if (selectedClientId == null && c.clientId != null) {
+                                        selectedClientId = c.clientId; selectedClientName = c.client.orEmpty()
+                                    }
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(c.name)
+                                        val sub = listOfNotNull(c.email?.takeIf { it.isNotBlank() }, c.client?.takeIf { selectedClientId == null && it.isNotBlank() })
+                                        if (sub.isNotEmpty()) Text(sub.joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                        if (response.total > response.data.size) {
+                            Text("Search by name or email to find more contacts.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -342,6 +423,30 @@ fun CreateTicketScreen(navController: NavController) {
                                 Text(
                                     selectedClientName.ifBlank { "Select department (optional)" },
                                     color = if (selectedClientName.isBlank()) MaterialTheme.colorScheme.outline
+                                            else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                    Column(
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SectionLabel("Contact")
+                        Surface(
+                            onClick = { contactSearch = ""; showContactPicker = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Person, null, tint = MaterialTheme.colorScheme.outline)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    selectedContactName.ifBlank { if (selectedClientId != null) "Primary contact (tap to search)" else "Search contacts (optional)" },
+                                    color = if (selectedContactName.isBlank()) MaterialTheme.colorScheme.outline
                                             else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
