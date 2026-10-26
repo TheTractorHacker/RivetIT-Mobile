@@ -90,6 +90,20 @@ fun BrandMark(size: Dp, modifier: Modifier = Modifier) {
         }
         return
     }
+    if (brand.fromServer) {
+        // Connected to a server with no (or unreadable) logo: the company's own initial, not our mark.
+        Box(
+            modifier.size(size).clip(BrandTileShape).background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Text(
+                brand.name.trim().take(1).uppercase().ifEmpty { "?" },
+                color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = (size.value * 0.45f).sp),
+            )
+        }
+        return
+    }
     Box(
         modifier
             .size(size)

@@ -207,7 +207,7 @@ fun ServerSetupScreen(prefs: AppPreferences, onDone: () -> Unit) {
     ) {
         Spacer(Modifier.height(64.dp))
 
-        com.foleyit.itflow.ui.components.BrandMark(72.dp)
+        com.foleyit.itflow.ui.components.BrandMark(76.dp)
         Spacer(Modifier.height(24.dp))
         Text("Connect to RivetIT", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))

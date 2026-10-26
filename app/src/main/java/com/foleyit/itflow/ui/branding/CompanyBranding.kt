@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.map
 data class CompanyBranding(
     val name: String = "RivetIT",
     val logoConfigured: Boolean = false,
+    /** True once the name came from the connected server; the RivetIT mark is then never shown. */
+    val fromServer: Boolean = false,
     val bitmap: Bitmap? = null,
     val loading: Boolean = false,
 )

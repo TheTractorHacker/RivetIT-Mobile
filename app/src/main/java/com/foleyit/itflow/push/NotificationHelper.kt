@@ -40,7 +40,7 @@ object NotificationHelper {
         // client PII) should only be shown once the device is unlocked.
         val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("RivetIT")
+            .setContentTitle(com.foleyit.itflow.ui.branding.CompanyNameStore.last(context) ?: "RivetIT")
             .setContentText("New ticket update")
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
