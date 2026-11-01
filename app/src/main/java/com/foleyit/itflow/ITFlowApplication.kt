@@ -19,6 +19,8 @@ class ITFlowApplication : Application() {
         // captured too.
         CrashReporter.install(this)
         prefs = AppPreferences(this)
+        // Downloaded attachments and camera shots are temporary; start every process with none left over.
+        Thread { com.foleyit.itflow.ui.screens.tickets.attachments.AttachmentTransfer.clearTemp(this) }.start()
         NotificationHelper.createChannel(this)
         runBlocking {
             val url     = prefs.serverUrl.first()

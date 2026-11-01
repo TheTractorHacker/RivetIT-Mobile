@@ -1,4 +1,151 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RivetIT</string>
+
+    <!-- Navigation -->
+    <string name="nav_approvals">Approvals</string>
+    <string name="nav_new_request">New request</string>
+    <string name="nav_my_tasks">My tasks</string>
+    <string name="nav_approvals_badge">%1$d waiting</string>
+    <string name="nav_tasks_badge">%1$d overdue</string>
+    <string name="menu_open_description">Menu, items need attention</string>
+    <string name="fab_new_ticket">New ticket</string>
+    <string name="fab_create_menu">Create</string>
+
+    <!-- Shared -->
+    <string name="action_retry">Retry</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_done">Done</string>
+    <string name="action_back">Back</string>
+    <string name="loading">Loading</string>
+    <string name="error_title">Something went wrong</string>
+    <string name="no_access">You don\'t have access to this section</string>
+    <string name="showing_saved_data">Showing the last saved list. Pull down to refresh.</string>
+
+    <!-- Approvals -->
+    <string name="approvals_title">Approvals</string>
+    <string name="approvals_empty">Nothing waiting on you</string>
+    <string name="approvals_kind_request">Service request</string>
+    <string name="approvals_kind_task">Workflow task</string>
+    <string name="approvals_requested_by">Requested by %1$s</string>
+    <string name="approvals_requested_at">Requested %1$s</string>
+    <string name="approvals_due">Due %1$s</string>
+    <string name="approvals_risk">Risk %1$d</string>
+    <string name="approvals_risk_desc">Risk score %1$d out of 100, %2$s</string>
+    <string name="risk_low">low</string>
+    <string name="risk_medium">medium</string>
+    <string name="risk_high">high</string>
+    <string name="approvals_step">Step: %1$s</string>
+    <string name="approvals_answers">Answers</string>
+    <string name="approvals_no_answers">No answers were provided.</string>
+    <string name="approvals_open_ticket">Open ticket #%1$d</string>
+    <string name="approvals_comment_label">Comment</string>
+    <string name="approvals_comment_hint">Required to reject, optional to approve</string>
+    <string name="approvals_comment_required">Add a comment to reject</string>
+    <string name="approvals_approve">Approve</string>
+    <string name="approvals_reject">Reject</string>
+    <string name="approvals_deciding">Sending your decision</string>
+    <string name="approvals_approved">Approved</string>
+    <string name="approvals_rejected">Rejected</string>
+    <string name="approvals_no_longer_waiting">That approval is no longer waiting on you</string>
+    <string name="approvals_decision_failed">Could not send your decision: %1$s</string>
+    <string name="approvals_close_detail">Close details</string>
+
+    <!-- Requests -->
+    <string name="requests_title">New request</string>
+    <string name="requests_search">Search requests</string>
+    <string name="requests_search_clear">Clear search</string>
+    <string name="requests_popular">Popular this month</string>
+    <string name="requests_recent">Recently used</string>
+    <string name="requests_all">All requests</string>
+    <string name="requests_empty">No requests are available</string>
+    <string name="requests_no_matches">No requests match your search</string>
+    <string name="requests_needs_approval">Needs approval</string>
+    <string name="requests_needs_approval_desc">This request needs approval before work starts.</string>
+    <string name="requests_tile_desc">%1$s. %2$s</string>
+    <string name="requests_required_marker">required</string>
+    <string name="requests_select_placeholder">Select</string>
+    <string name="requests_pick_date">Pick a date</string>
+    <string name="requests_submit">Submit request</string>
+    <string name="requests_submitting">Submitting</string>
+    <string name="requests_err_required">This is required</string>
+    <string name="requests_err_ticked">This must be ticked</string>
+    <string name="requests_err_too_long">Too long (%1$d characters at most)</string>
+    <string name="requests_err_number">Enter a number</string>
+    <string name="requests_err_date">Pick a valid date</string>
+    <string name="requests_err_choice">Choose one of the options</string>
+    <string name="requests_fix_errors">Check the highlighted fields</string>
+    <string name="requests_submit_failed">Could not submit: %1$s</string>
+    <string name="requests_submit_uncertain">Could not confirm the request was sent. Check your tickets before trying again. %1$s</string>
+    <string name="requests_created">Request created</string>
+    <string name="requests_created_body">Your request was submitted and a ticket was opened.</string>
+    <string name="requests_pending">Waiting for approval</string>
+    <string name="requests_pending_body">Your request was submitted. Work starts once it is approved.</string>
+    <string name="requests_open_ticket">Open ticket</string>
+    <string name="requests_another">Make another request</string>
+    <string name="date_picker_ok">OK</string>
+
+    <!-- Tasks -->
+    <string name="tasks_title">My tasks</string>
+    <string name="tasks_empty">You have no workflow tasks</string>
+    <string name="tasks_overdue">Overdue</string>
+    <string name="tasks_due_soon">Due soon</string>
+    <string name="tasks_due">Due %1$s</string>
+    <string name="tasks_waiting_for">Waiting for: %1$s</string>
+    <string name="tasks_needs_approval">Needs approval</string>
+    <string name="tasks_open_approvals">Open approvals</string>
+    <string name="tasks_automatic">Runs automatically</string>
+    <string name="tasks_action_failed">The automatic step failed. An administrator can retry it from RivetIT on the web.</string>
+    <string name="tasks_status_completed">Completed</string>
+    <string name="tasks_status_skipped">Skipped</string>
+    <string name="tasks_status_running">In progress</string>
+    <string name="tasks_status_rejected">Rejected</string>
+    <string name="tasks_status_unknown">Status unavailable</string>
+    <string name="tasks_complete">Complete</string>
+    <string name="tasks_skip">Skip</string>
+    <string name="tasks_skip_title">Skip this task?</string>
+    <string name="tasks_skip_reason">Reason</string>
+    <string name="tasks_skip_reason_required">A reason is required</string>
+    <string name="tasks_skip_confirm">Skip task</string>
+    <string name="tasks_completed">Task completed</string>
+    <string name="tasks_skipped">Task skipped</string>
+    <string name="tasks_changed">That task changed. The list was refreshed.</string>
+    <string name="tasks_action_failed_msg">Could not update the task: %1$s</string>
+    <string name="tasks_for_person">For %1$s</string>
+
+    <!-- Attachments -->
+    <string name="attach_button">Attach</string>
+    <string name="attach_sheet_title">Add an attachment</string>
+    <string name="attach_camera">Camera</string>
+    <string name="attach_photo">Photo picker</string>
+    <string name="attach_files">Files</string>
+    <string name="attach_remove">Remove %1$s</string>
+    <string name="attach_retry">Retry %1$s</string>
+    <string name="attach_chip_desc">%1$s, %2$s</string>
+    <string name="attach_uploading">Uploading %1$d%%</string>
+    <string name="attach_waiting">Waiting to upload</string>
+    <string name="attach_uploaded">Uploaded</string>
+    <string name="attach_failed">Upload failed</string>
+    <string name="attach_camera_denied">Camera permission was denied. You can still pick a photo or a file.</string>
+    <string name="attach_no_camera">No camera app is available</string>
+    <string name="attach_err_extension">%1$s files can\'t be attached</string>
+    <string name="attach_err_extension_none">This file type can\'t be attached</string>
+    <string name="attach_err_too_large">%1$s is larger than the %2$s limit</string>
+    <string name="attach_err_empty">%1$s is empty</string>
+    <string name="attach_err_too_many">You can attach up to %1$d files</string>
+    <string name="attach_err_duplicate">%1$s is already attached</string>
+    <string name="attach_reply_sent_partial">Reply sent. Some attachments did not upload.</string>
+    <plurals name="attach_reply_sent_all">
+        <item quantity="one">Reply sent with %1$d attachment</item>
+        <item quantity="other">Reply sent with %1$d attachments</item>
+    </plurals>
+    <string name="attach_retry_uploads">Retry failed uploads</string>
+    <string name="attach_section_title">Attachments</string>
+    <string name="attach_load_failed">Could not load attachments</string>
+    <string name="attach_open_failed">Could not open the file: %1$s</string>
+    <string name="attach_no_viewer">No app can open this file</string>
+    <string name="attach_cannot_open_type">This file type can\'t be opened from the app</string>
+    <string name="attach_downloading">Downloading %1$s</string>
+    <string name="attach_by">%1$s, %2$s</string>
 </resources>

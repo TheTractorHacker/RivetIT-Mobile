@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}) {
+fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}, navController: androidx.navigation.NavController? = null) {
     var state by remember { mutableStateOf<Result<com.foleyit.itflow.data.api.NotificationsResponse>?>(null) }
     var pendingId by remember { mutableStateOf<Int?>(null) }
     var markingAll by remember { mutableStateOf(false) }
@@ -117,7 +117,13 @@ fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}) {
                                     }
                                 },
                                 content = {
-                                    NotifItem(n, pending = pendingId == n.id, enabled = pendingId == null && !markingAll) { markRead(n.id) }
+                                    // Notifications that name a destination (a ticket, an approval) open it when tapped.
+                                    val route = com.foleyit.itflow.ui.navigation.PushRouting.routeForNotification(n.type, n.action, n.kind, n.refId)
+                                        ?.let { com.foleyit.itflow.ui.navigation.DeepLinks.resolve(it) }
+                                    NotifItem(
+                                        n, pending = pendingId == n.id, enabled = pendingId == null && !markingAll,
+                                        onOpen = if (route != null && navController != null) ({ navController.navigate(route) }) else null,
+                                    ) { markRead(n.id) }
                                 }
                             )
                         }
@@ -129,8 +135,9 @@ fun NotificationsScreen(onUnreadChanged: (Boolean) -> Unit = {}) {
 }
 
 @Composable
-private fun NotifItem(n: Notification, pending: Boolean, enabled: Boolean, onMarkRead: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+private fun NotifItem(n: Notification, pending: Boolean, enabled: Boolean, onOpen: (() -> Unit)? = null, onMarkRead: () -> Unit) {
+    val cardModifier = Modifier.fillMaxWidth()
+    val content: @Composable ColumnScope.() -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -138,6 +145,7 @@ private fun NotifItem(n: Notification, pending: Boolean, enabled: Boolean, onMar
             Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
                 Box(contentAlignment = Alignment.Center) {
                     val icon = when {
+                        n.type.contains("approval") -> Icons.Outlined.HowToReg
                         n.type.contains("ticket") -> Icons.Outlined.ConfirmationNumber
                         n.type.contains("invoice") -> Icons.AutoMirrored.Outlined.ReceiptLong
                         else -> Icons.Outlined.Notifications
@@ -160,4 +168,6 @@ private fun NotifItem(n: Notification, pending: Boolean, enabled: Boolean, onMar
             }
         }
     }
+    if (onOpen != null) Card(onClick = onOpen, modifier = cardModifier, shape = MaterialTheme.shapes.large, content = content)
+    else Card(modifier = cardModifier, shape = MaterialTheme.shapes.large, content = content)
 }

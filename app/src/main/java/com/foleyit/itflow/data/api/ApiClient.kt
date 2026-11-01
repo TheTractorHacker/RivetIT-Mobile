@@ -53,6 +53,10 @@ object ApiClient {
 
     private fun clearCachedResponses() {
         try { _httpCache?.evictAll() } catch (_: Exception) { /* A failed eviction must not block sign-out. */ }
+        // In-memory feature lists/badges and downloaded attachment temp files belong to the previous session too.
+        runCatching { com.foleyit.itflow.data.repo.FeatureCache.shared.clear() }
+        runCatching { com.foleyit.itflow.data.repo.FeatureBadges.shared.clear() }
+        _appContext?.let { runCatching { com.foleyit.itflow.ui.screens.tickets.attachments.AttachmentTransfer.clearTemp(it) } }
     }
 
     /** Drop ticket GETs after creating a ticket so returning to the list shows it immediately. */

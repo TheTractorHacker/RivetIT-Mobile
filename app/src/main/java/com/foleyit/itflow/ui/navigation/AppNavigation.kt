@@ -50,6 +50,11 @@ sealed class Screen(val route: String) {
     object KnowledgeBase : Screen("kb")
     object KbArticleDetail : Screen("kb/{id}") { fun go(id: Int) = "kb/$id" }
     object Alerts        : Screen("alerts")
+    object Approvals     : Screen("approvals")
+    /** Opens the approvals list with this item's detail already showing (push / deep link). */
+    object ApprovalDetail: Screen("approvals/{kind}/{id}") { fun go(kind: String, id: Int) = "approvals/$kind/$id" }
+    object Requests      : Screen("requests")
+    object MyTasks       : Screen("tasks")
 }
 
 data class BottomNavItem(

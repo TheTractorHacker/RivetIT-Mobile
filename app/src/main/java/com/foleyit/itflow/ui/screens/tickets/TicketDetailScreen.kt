@@ -36,6 +36,13 @@ import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadingScreen
 import com.foleyit.itflow.ui.components.PriorityBadge
 import com.foleyit.itflow.ui.util.userMessage
+import com.foleyit.itflow.R
+import com.foleyit.itflow.data.model.TicketAttachment
+import com.foleyit.itflow.data.api.FeatureParsers
+import com.foleyit.itflow.ui.screens.tickets.attachments.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -76,6 +83,21 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     var refresh by remember { mutableIntStateOf(0) }
     var chargesEnabled by remember { mutableStateOf(false) }
 
+    // Attachments: files listed on the ticket, and the files queued for the reply being written.
+    val ctx = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val canViewAttachments = com.foleyit.itflow.data.LocalCapabilities.current.canView(com.foleyit.itflow.data.Capabilities.SUPPORT)
+    var attachments by remember { mutableStateOf<List<TicketAttachment>>(emptyList()) }
+    var attachmentsFailed by remember { mutableStateOf(false) }
+    var openingAttachmentId by remember { mutableStateOf<Int?>(null) }
+    var queue by remember { mutableStateOf(AttachmentQueue()) }
+    var replyPosted by remember { mutableStateOf(false) }
+    var showAttachSheet by remember { mutableStateOf(false) }
+    val maxUploadBytes = AttachmentRules.DEFAULT_MAX_BYTES
+    // Temp files (downloads, camera shots) are removed when the screen closes; recent ones stay so a viewer that was
+    // just launched can still read its file.
+    DisposableEffect(Unit) { onDispose { AttachmentTransfer.clearTemp(ctx, olderThanMs = 10 * 60_000L) } }
+
     LaunchedEffect(timerRunning) {
         if (timerRunning) {
             timerStart = System.currentTimeMillis() - elapsed * 1000
@@ -101,6 +123,14 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
             chargesEnabled = runCatching { ApiClient.profile() }.getOrNull()?.modules?.ticketChargesEnabled ?: false
             worksheets = runCatching { ApiClient.service().getTicketWorksheets(id) }.getOrDefault(emptyList())
             outtakes = runCatching { ApiClient.service().getTicketOuttakes(id) }.getOrDefault(emptyList())
+            if (canViewAttachments) {
+                runCatching { FeatureParsers.attachments(ApiClient.service().getTicketAttachments(id)) }
+                    .onSuccess { attachments = it; attachmentsFailed = false }
+                    .onFailure { e ->
+                        // An older server without the endpoint (404) just has no section; other failures say so.
+                        attachmentsFailed = (e as? retrofit2.HttpException)?.code() != 404
+                    }
+            }
             if (statuses.isEmpty()) {
                 statuses = runCatching { ApiClient.service().getTicketStatuses() }.getOrDefault(emptyList())
             }
@@ -150,24 +180,79 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
         )
     }
 
+    val pickers = rememberAttachmentPickers(
+        onPicked = { uris ->
+            val (q, rejected) = addPicked(ctx, queue, uris, maxUploadBytes)
+            queue = q
+            if (rejected != null) scope.launch { snackbar.showSnackbar(rejectionMessage(resources, rejected.first, rejected.second, maxUploadBytes)) }
+        },
+        onMessage = { id -> scope.launch { snackbar.showSnackbar(resources.getString(id)) } },
+    )
+    if (showAttachSheet) AttachSourceSheet(pickers, onDismiss = { showAttachSheet = false })
+
+    fun closeReply() {
+        showReply = false; replyError = null; replyPosted = false; queue = AttachmentQueue()
+        AttachmentTransfer.clearTemp(ctx, olderThanMs = 10 * 60_000L)
+    }
+
+    // Uploads every queued file in order after the reply is stored, updating progress per file. A failure keeps the
+    // file in the queue with a Retry; files already uploaded are never sent twice.
+    suspend fun uploadQueued() {
+        for (item in queue.toUpload) {
+            queue = queue.uploading(item.id, 0)
+            try {
+                AttachmentTransfer.upload(ctx, id, item) { pct -> queue = queue.uploading(item.id, pct) }
+                queue = queue.done(item.id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                queue = queue.failed(item.id, userMessage(e))
+            }
+        }
+    }
+
     if (showReply) {
         ReplySheet(
             defaultTimeWorked = if (elapsed > 0) timeWorkedString else "",
             statuses = statuses,
             submitting = replySubmitting,
             errorMessage = replyError,
-            onDismiss = { if (!replySubmitting) { showReply = false; replyError = null } },
+            canAttach = canWrite,
+            attachments = queue,
+            replyPosted = replyPosted,
+            onAttach = { showAttachSheet = true },
+            onRemoveAttachment = { queue = queue.remove(it) },
+            onRetryAttachment = { queue = queue.retry(it) },
+            onDismiss = {
+                if (!replySubmitting) {
+                    val failed = replyPosted && !queue.allDone
+                    closeReply()
+                    if (failed) { load(); scope.launch { snackbar.showSnackbar(resources.getString(R.string.attach_reply_sent_partial)) } }
+                }
+            },
             onSubmit = { reply, type, timeWorked, onsite, statusId ->
                 if (!replySubmitting) {
                     replySubmitting = true
                     replyError = null
                     scope.launch {
                         try {
-                            ApiClient.service().addReply(id, reply, type = type,
-                                timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
-                            showReply = false
+                            if (!replyPosted) {
+                                ApiClient.service().addReply(id, reply, type = type,
+                                    timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
+                                replyPosted = true
+                                if (elapsed > 0) elapsed = 0L
+                            }
+                            uploadQueued()
                             load()
-                            if (elapsed > 0) elapsed = 0L
+                            if (queue.hasFailures) {
+                                snackbar.showSnackbar(resources.getString(R.string.attach_reply_sent_partial))
+                            } else {
+                                val n = queue.items.size
+                                closeReply()
+                                if (n > 0) snackbar.showSnackbar(resources.getQuantityString(R.plurals.attach_reply_sent_all, n, n))
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             replyError = "Could not confirm the save. Check ticket history before trying again: ${userMessage(e)}"
                         } finally {
@@ -413,6 +498,37 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         }
                     }
 
+                    // Files on the ticket (and on its replies); tap downloads through the authenticated endpoint and opens.
+                    if (attachments.isNotEmpty()) {
+                        item(key = "attachments") {
+                            AttachmentsCard(attachments, openingAttachmentId, onOpen = { att ->
+                                openingAttachmentId = att.id
+                                scope.launch {
+                                    try {
+                                        val intent = if (AttachmentRules.openMime(att.name) == null) null else {
+                                            val f = AttachmentTransfer.download(ctx, att)
+                                            AttachmentTransfer.viewIntent(ctx, f, att.name)
+                                        }
+                                        if (intent == null) snackbar.showSnackbar(resources.getString(R.string.attach_cannot_open_type))
+                                        else try { ctx.startActivity(intent) } catch (_: android.content.ActivityNotFoundException) {
+                                            snackbar.showSnackbar(resources.getString(R.string.attach_no_viewer))
+                                        }
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (e: Exception) {
+                                        snackbar.showSnackbar(resources.getString(R.string.attach_open_failed, userMessage(e)))
+                                    } finally {
+                                        openingAttachmentId = null
+                                    }
+                                }
+                            })
+                        }
+                    } else if (attachmentsFailed) {
+                        item(key = "attachments_error") {
+                            Text(stringResource(R.string.attach_load_failed), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+
                     // The internal edition hides charges when this module is disabled.
                     if (chargesEnabled) {
                         item {
@@ -506,6 +622,12 @@ private fun ReplySheet(
     statuses: List<TicketStatus>,
     submitting: Boolean,
     errorMessage: String?,
+    canAttach: Boolean,
+    attachments: AttachmentQueue,
+    replyPosted: Boolean,
+    onAttach: () -> Unit,
+    onRemoveAttachment: (Long) -> Unit,
+    onRetryAttachment: (Long) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (reply: String, type: String, timeWorked: String, onsite: Boolean, statusId: Int?) -> Unit
 ) {
@@ -569,9 +691,19 @@ private fun ReplySheet(
             OutlinedTextField(
                 value = reply, onValueChange = { reply = it },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !replyPosted,
                 label = { Text(if (replyType == "note") "Internal note" else "Public reply") },
                 minLines = 4, maxLines = 8
             )
+            if (canAttach) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onAttach, enabled = !submitting && attachments.items.size < AttachmentRules.MAX_FILES) {
+                    Icon(Icons.Outlined.AttachFile, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.attach_button))
+                }
+                AttachmentChips(attachments, enabled = !submitting && !replyPosted, onRemove = onRemoveAttachment, onRetry = onRetryAttachment)
+            }
             Spacer(Modifier.height(16.dp))
             Text("Time worked", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
@@ -609,7 +741,9 @@ private fun ReplySheet(
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss, enabled = !submitting) { Text("Cancel") }
+                TextButton(onClick = onDismiss, enabled = !submitting) {
+                    Text(if (replyPosted) stringResource(R.string.action_close) else "Cancel")
+                }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
@@ -623,7 +757,13 @@ private fun ReplySheet(
                     enabled = reply.isNotBlank() && !submitting
                 ) {
                     if (submitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(if (replyType == "note") "Add internal note" else "Send public reply")
+                    else Text(
+                        when {
+                            replyPosted -> stringResource(R.string.attach_retry_uploads)
+                            replyType == "note" -> "Add internal note"
+                            else -> "Send public reply"
+                        }
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -1313,4 +1453,14 @@ private fun createFormError(name: String, error: Exception): String = if (error 
     "Could not confirm the $name. Check the ticket before trying again."
 } else {
     "Could not create $name: ${userMessage(error)}"
+}
+
+
+/** Same text as the picker rejections, for use outside composition (snackbars). */
+private fun rejectionMessage(resources: android.content.res.Resources, name: String, r: Rejection, maxBytes: Long): String = when (r) {
+    is Rejection.Extension -> if (r.ext.isEmpty()) resources.getString(R.string.attach_err_extension_none) else resources.getString(R.string.attach_err_extension, ".${r.ext}")
+    is Rejection.TooLarge -> resources.getString(R.string.attach_err_too_large, name, AttachmentRules.formatSize(maxBytes))
+    Rejection.Empty -> resources.getString(R.string.attach_err_empty, name)
+    Rejection.TooMany -> resources.getString(R.string.attach_err_too_many, AttachmentRules.MAX_FILES)
+    Rejection.Duplicate -> resources.getString(R.string.attach_err_duplicate, name)
 }
