@@ -178,7 +178,7 @@ import RivetCore
                 switch try await session.signIn(username: username.trimmingCharacters(in: .whitespaces), password: password,
                                                 totp: needsCode ? code : nil) {
                 case .signedIn: break
-                case .needsTwoFactor: needsCode = true; error = "Enter your authentication code."
+                case .needsTwoFactor: needsCode = true; error = "Your password was accepted. Enter the code from your authenticator app to finish signing in."
                 }
             } catch { self.error = userMessage(for: error) }
         }

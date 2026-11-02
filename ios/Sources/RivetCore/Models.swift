@@ -25,7 +25,32 @@ public struct UserInfo: Decodable, Hashable {
 public struct LoginResponse: Decodable {
     public let token: String?
     public let user: UserInfo?
+    /// True when the server wants a 2FA code (`{"requires_2fa": true}`) before it issues a token.
     public let requires2fa: Bool?
+
+    public init(token: String? = nil, user: UserInfo? = nil, requires2fa: Bool? = nil) {
+        self.token = token; self.user = user; self.requires2fa = requires2fa
+    }
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    /// The 2FA flag is matched by its letters and digits only, so it is found however the decoder's snake_case
+    /// conversion spells `requires_2fa`. A missed flag looked exactly like a bad password.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyKey.self)
+        token = try c.decodeIfPresent(String.self, forKey: AnyKey(stringValue: "token")!)
+        user = try c.decodeIfPresent(UserInfo.self, forKey: AnyKey(stringValue: "user")!)
+        var flag: Bool?
+        for key in c.allKeys where key.stringValue.lowercased().replacingOccurrences(of: "_", with: "") == "requires2fa" {
+            flag = try? c.decode(Bool.self, forKey: key)
+        }
+        requires2fa = flag
+    }
 }
 
 public struct ModuleFlags: Decodable, Hashable {
@@ -120,8 +145,9 @@ public struct TicketReply: Decodable, Identifiable, Hashable {
     public let onsite: Bool?
     public let by: String?
     public let createdAt: String?
+    public let attachments: [TicketAttachment]
 
-    enum CodingKeys: String, CodingKey { case id, body, type, timeWorked, onsite, by, createdAt }
+    enum CodingKeys: String, CodingKey { case id, body, type, timeWorked, onsite, by, createdAt, attachments }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
@@ -131,6 +157,7 @@ public struct TicketReply: Decodable, Identifiable, Hashable {
         onsite = LossyBool.decode(c, .onsite)
         by = try c.decodeIfPresent(String.self, forKey: .by)
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        attachments = try c.decodeIfPresent([TicketAttachment].self, forKey: .attachments) ?? []
     }
 }
 
@@ -152,10 +179,11 @@ public struct TicketDetail: Decodable, Hashable {
     public let dueAt: String?
     public let resolvedAt: String?
     public let replies: [TicketReply]
+    public let attachments: [TicketAttachment]
 
     enum CodingKeys: String, CodingKey {
         case id, number, subject, details, priority, status, statusColor, client, assignedTo, contactName,
-             contactEmail, contactPhone, billable, createdAt, dueAt, resolvedAt, replies
+             contactEmail, contactPhone, billable, createdAt, dueAt, resolvedAt, replies, attachments
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -176,6 +204,7 @@ public struct TicketDetail: Decodable, Hashable {
         dueAt = try c.decodeIfPresent(String.self, forKey: .dueAt)
         resolvedAt = try c.decodeIfPresent(String.self, forKey: .resolvedAt)
         replies = try c.decodeIfPresent([TicketReply].self, forKey: .replies) ?? []
+        attachments = try c.decodeIfPresent([TicketAttachment].self, forKey: .attachments) ?? []
     }
 }
 

@@ -28,6 +28,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.*
+import com.foleyit.itflow.data.Capabilities
+import com.foleyit.itflow.data.LocalCapabilities
+import com.foleyit.itflow.data.attachments.AttachmentRules
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import com.foleyit.itflow.data.attachments.PickedFile
+import com.foleyit.itflow.data.attachments.StreamingFileBody
+import com.foleyit.itflow.data.attachments.describe
+import com.foleyit.itflow.data.attachments.ticketAttachmentUrl
 import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.util.fmtDate
 import java.text.NumberFormat
@@ -65,6 +74,8 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     // Sheets
     var showReply by rememberSaveable { mutableStateOf(false) }
     var replySubmitting by remember { mutableStateOf(false) }
+    var uploadProgress by remember { mutableStateOf<Float?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var replyError by remember { mutableStateOf<String?>(null) }
     var showStatusPicker by remember { mutableStateOf(false) }
     var showAddWorksheet by remember { mutableStateOf(false) }
@@ -155,23 +166,54 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
             defaultTimeWorked = if (elapsed > 0) timeWorkedString else "",
             statuses = statuses,
             submitting = replySubmitting,
+            uploadProgress = uploadProgress,
             errorMessage = replyError,
             onDismiss = { if (!replySubmitting) { showReply = false; replyError = null } },
-            onSubmit = { reply, type, timeWorked, onsite, statusId ->
+            onSubmit = { reply, type, timeWorked, onsite, statusId, files ->
                 if (!replySubmitting) {
                     replySubmitting = true
                     replyError = null
+                    uploadProgress = if (files.isEmpty()) null else 0f
                     scope.launch {
                         try {
-                            ApiClient.service().addReply(id, reply, type = type,
-                                timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
+                            if (files.isEmpty()) {
+                                ApiClient.service().addReply(id, reply, type = type,
+                                    timeWorked = timeWorked.ifBlank { null }, onsite = onsite, statusId = statusId)
+                            } else {
+                                val total = files.sumOf { it.size }.coerceAtLeast(1L)
+                                val sent = LongArray(files.size)
+                                val parts = files.mapIndexed { i, f ->
+                                    StreamingFileBody(context.contentResolver, f) { written ->
+                                        sent[i] = written
+                                        uploadProgress = (sent.sum().toFloat() / total).coerceIn(0f, 1f)
+                                    }.part()
+                                }
+                                fun text(v: String) = v.toRequestBody("text/plain".toMediaType())
+                                val fields = buildMap<String, okhttp3.RequestBody> {
+                                    put("reply", text(reply)); put("type", text(type))
+                                    put("onsite", text(if (onsite) "1" else "0"))
+                                    timeWorked.ifBlank { null }?.let { put("time_worked", text(it)) }
+                                    statusId?.let { put("status_id", text(it.toString())) }
+                                }
+                                val result = ApiClient.service().addReplyWithFiles(id, fields, parts)
+                                val stored = result.attachments?.size ?: 0
+                                if (stored < files.size) {
+                                    // The reply is saved, so the sheet closes; say plainly which part did not make it.
+                                    snackbar.showSnackbar("Reply posted, but ${files.size - stored} of ${files.size} attachment(s) were rejected by the server")
+                                }
+                            }
+                            ApiClient.invalidateTicketResponses()
                             showReply = false
                             load()
                             if (elapsed > 0) elapsed = 0L
                         } catch (e: Exception) {
-                            replyError = "Could not confirm the save. Check ticket history before trying again: ${userMessage(e)}"
+                            replyError = if (files.isEmpty())
+                                "Could not confirm the save. Check ticket history before trying again: ${userMessage(e)}"
+                            else
+                                "Could not confirm the upload. Check ticket history before trying again (your draft and files are kept): ${userMessage(e)}"
                         } finally {
                             replySubmitting = false
+                            uploadProgress = null
                         }
                     }
                 }
@@ -413,6 +455,19 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                         }
                     }
 
+                    if (!ticket.attachments.isNullOrEmpty()) {
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                                Column(Modifier.padding(16.dp)) {
+                                    Text("Attachments", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.height(4.dp))
+                                    AttachmentRows(ticket.attachments)
+                                }
+                            }
+                        }
+                    }
+
                     // The internal edition hides charges when this module is disabled.
                     if (chargesEnabled) {
                         item {
@@ -505,9 +560,10 @@ private fun ReplySheet(
     defaultTimeWorked: String,
     statuses: List<TicketStatus>,
     submitting: Boolean,
+    uploadProgress: Float?,
     errorMessage: String?,
     onDismiss: () -> Unit,
-    onSubmit: (reply: String, type: String, timeWorked: String, onsite: Boolean, statusId: Int?) -> Unit
+    onSubmit: (reply: String, type: String, timeWorked: String, onsite: Boolean, statusId: Int?, files: List<PickedFile>) -> Unit
 ) {
     var reply by rememberSaveable { mutableStateOf("") }
     var replyType by rememberSaveable { mutableStateOf("note") }
@@ -516,6 +572,27 @@ private fun ReplySheet(
     var minutes by rememberSaveable { mutableIntStateOf(initialM) }
     var onsite by rememberSaveable { mutableStateOf(false) }
     var selectedStatusId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var files by remember { mutableStateOf<List<PickedFile>>(emptyList()) }
+    var attachProblem by remember { mutableStateOf<String?>(null) }
+    val canAttach = LocalCapabilities.current.canWrite(Capabilities.SUPPORT)
+    val resolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        val problems = mutableListOf<String>()
+        val next = files.toMutableList()
+        for (uri in uris) {
+            val picked = runCatching { resolver.describe(uri) }.getOrNull()
+            when {
+                picked == null -> problems += "Could not read the selected file"
+                next.any { it.uri == uri } -> Unit // already attached: ignore a repeat pick
+                next.size >= AttachmentRules.MAX_FILES -> problems += "At most ${AttachmentRules.MAX_FILES} files per reply"
+                else -> AttachmentRules.problem(picked.name, picked.size)?.let { problems += it } ?: next.add(picked)
+            }
+        }
+        files = next
+        attachProblem = problems.firstOrNull()
+    }
 
     // Mirrors the web app's reply-form "Submit & set status to…" dropdown, which excludes
     // "New" (not a status a reply returns a ticket to) and "Closed" (only ever reached via
@@ -602,6 +679,38 @@ private fun ReplySheet(
                     }
                 }
             }
+            if (canAttach) {
+                Spacer(Modifier.height(16.dp))
+                Text("Attachments (optional)", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                files.forEach { f ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.AttachFile, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("${f.name} · ${AttachmentRules.humanSize(f.size)}", Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        IconButton(onClick = { files = files - f }, enabled = !submitting) {
+                            Icon(Icons.Outlined.Close, "Remove ${f.name}")
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { picker.launch("*/*") }, enabled = !submitting) {
+                    Icon(Icons.Outlined.AttachFile, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (files.isEmpty()) "Attach files" else "Add more")
+                }
+                attachProblem?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (submitting && uploadProgress != null) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(progress = { uploadProgress }, modifier = Modifier.fillMaxWidth())
+                    Text("Uploading ${(uploadProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             errorMessage?.let {
                 Spacer(Modifier.height(12.dp))
                 Text(it, color = MaterialTheme.colorScheme.error,
@@ -617,13 +726,16 @@ private fun ReplySheet(
                             val timeWorked = if (hours > 0 || minutes > 0)
                                 "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00"
                             else ""
-                            onSubmit(reply, replyType, timeWorked, onsite, selectedStatusId)
+                            onSubmit(reply, replyType, timeWorked, onsite, selectedStatusId, files)
                         }
                     },
                     enabled = reply.isNotBlank() && !submitting
                 ) {
                     if (submitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(if (replyType == "note") "Add internal note" else "Send public reply")
+                    else Text(
+                        (if (replyType == "note") "Add internal note" else "Send public reply") +
+                            if (files.isNotEmpty()) " + ${files.size} file${if (files.size == 1) "" else "s"}" else ""
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -801,6 +913,33 @@ private fun ReplyCard(reply: TicketReply, ticketId: Int, onDeleted: () -> Unit, 
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
                 }
+            }
+            if (!reply.attachments.isNullOrEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                AttachmentRows(reply.attachments)
+            }
+        }
+    }
+}
+
+/** Attachment names with an Open button. Links open only when they are same-origin ticket uploads. */
+@Composable
+private fun AttachmentRows(items: List<TicketAttachment>) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    items.forEach { att ->
+        val link = ticketAttachmentUrl(ApiClient.serverUrl, att.url)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.AttachFile, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(att.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            if (link != null) {
+                IconButton(onClick = {
+                    try {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link)))
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        android.widget.Toast.makeText(context, "No app found to open this file", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, "Open ${att.name}") }
             }
         }
     }

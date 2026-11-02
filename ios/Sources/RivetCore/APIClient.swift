@@ -62,7 +62,11 @@ public final class APIClient: @unchecked Sendable {
 
     @discardableResult
     func perform(_ method: String, _ path: String, query: [String: String] = [:], body: AnyEncodable? = nil) async throws -> Data {
-        let request = try makeRequest(method, path, query: query, body: body)
+        try await perform(request: try makeRequest(method, path, query: query, body: body))
+    }
+
+    @discardableResult
+    func perform(request: URLRequest) async throws -> Data {
         let data: Data, response: HTTPURLResponse
         do { (data, response) = try await transport.send(request) }
         catch let e as RivetError { throw e }
@@ -143,6 +147,22 @@ public extension APIClient {
     }
     func ticket(_ id: Int) async throws -> TicketDetail { try await get("tickets/\(id)") }
     func addReply(ticketId: Int, _ body: AddReplyRequest) async throws { try await sendVoid("POST", "tickets/\(ticketId)/reply", body: body) }
+
+    /// A reply with files in one request, so the reply and its attachments are confirmed together.
+    func addReply(ticketId: Int, _ body: AddReplyRequest, files: [ReplyFile]) async throws -> ReplyWithFilesResult {
+        var form = MultipartForm()
+        form.fields = [("reply", body.reply), ("type", body.type), ("onsite", String(body.onsite))]
+        if let t = body.timeWorked { form.fields.append(("time_worked", t)) }
+        if let s = body.statusId { form.fields.append(("status_id", String(s))) }
+        form.files = files
+        var request = try makeRequest("POST", "tickets/\(ticketId)/reply")
+        request.httpBody = form.body()
+        request.setValue(form.contentType, forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300
+        let data = try await perform(request: request)
+        do { return try APIClient.decoder.decode(ReplyWithFilesResult.self, from: data) }
+        catch { throw RivetError.decoding(String(describing: error)) }
+    }
     func deleteReply(ticketId: Int, replyId: Int) async throws { try await sendVoid("DELETE", "tickets/\(ticketId)/reply/\(replyId)") }
     func setStatus(ticketId: Int, statusId: Int) async throws { try await sendVoid("POST", "tickets/\(ticketId)/status", body: StatusBody(statusId: statusId)) }
     func statuses() async throws -> [TicketStatus] { try await get("statuses") }

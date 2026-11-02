@@ -23,6 +23,7 @@ fun userMessage(e: Throwable): String = when (e) {
             401 -> "Your session has expired. Please sign in again."
             403 -> "You don't have permission to do this."
             404 -> "Not found."
+            413 -> "The server rejected this upload as too large. Try a smaller file."
             in 500..599 -> "The server ran into a problem. Please try again."
             else -> "Something went wrong. Please try again."
         }

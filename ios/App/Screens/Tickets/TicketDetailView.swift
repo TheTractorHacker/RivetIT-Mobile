@@ -29,6 +29,7 @@ import RivetCore
                         header(ticket)
                         if timerRunning || elapsed > 0 { timerBar }
                         if let d = ticket.details, !d.isEmpty { description(d) }
+                        if !ticket.attachments.isEmpty { attachmentsCard(ticket.attachments) }
                         formsCard
                         if !ticket.replies.isEmpty { replies(ticket.replies) }
                         if let actionError { InlineError(message: actionError).padding(.horizontal, 16) }
@@ -57,10 +58,11 @@ import RivetCore
         }
         .sheet(isPresented: $showReply) {
             if let ticket = loader.value {
-                ReplySheet(ticketId: ticket.id, statuses: statuses, initialMinutes: max(0, elapsed / 60)) {
+                ReplySheet(ticketId: ticket.id, statuses: statuses, initialMinutes: max(0, elapsed / 60),
+                           onSent: {
                     elapsed = 0; timerRunning = false
                     Task { await load() }
-                }.presentationDetents([.large])
+                }, onPartial: { actionError = $0 }).presentationDetents([.large])
             }
         }
         .confirmationDialog("Change status", isPresented: $showStatusPicker, titleVisibility: .visible) {
@@ -107,6 +109,14 @@ import RivetCore
     /// Worksheets and outtake forms: the lists the Android card shows. Creating and filling them is not in the iOS app yet.
     private var formsCard: some View {
         FormsCard(ticketId: id).padding(.horizontal, 16)
+    }
+
+    private func attachmentsCard(_ items: [TicketAttachment]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Attachments").font(.footnote.weight(.semibold)).foregroundColor(Palette.label2)
+            AttachmentList(items: items)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).card().padding(.horizontal, 16)
     }
 
     private func replies(_ replies: [TicketReply]) -> some View {
@@ -167,6 +177,27 @@ import RivetCore
     }
 }
 
+/// Attachment names with an Open link. A link is shown only when it is a same-origin ticket upload.
+@MainActor struct AttachmentList: View {
+    let items: [TicketAttachment]
+    @EnvironmentObject var session: Session
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(items) { item in
+                HStack {
+                    Image(systemName: "paperclip").foregroundColor(Palette.label2)
+                    Text(item.name).font(.subheadline)
+                    Spacer()
+                    if let server = session.serverURL, let url = ticketAttachmentURL(server: server, path: item.url) {
+                        Link(destination: url) { Image(systemName: "arrow.up.right.square") }
+                            .accessibilityLabel("Open \(item.name)")
+                    }
+                }
+            }
+        }
+    }
+}
+
 @MainActor struct ReplyCard: View {
     let reply: TicketReply
     var body: some View {
@@ -185,6 +216,7 @@ import RivetCore
                 if let t = TimeWorked.display(reply.timeWorked) { Pill(text: t, tone: .cyan, small: true) }
             }
             Text(HTMLText.plain(reply.body)).font(.subheadline)
+            if !reply.attachments.isEmpty { AttachmentList(items: reply.attachments) }
         }
         .frame(maxWidth: .infinity, alignment: .leading).card(padding: 14)
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(isNote ? Palette.brand.opacity(0.25) : Color.clear, lineWidth: 1))

@@ -146,6 +146,7 @@ public func userMessage(for error: Error) -> String {
         case 401: return "Your session has expired. Please sign in again."
         case 403: return "You don't have permission to do this."
         case 404: return "Not found."
+        case 413: return "The server rejected this upload as too large. Try a smaller file."
         case 500...599: return "The server ran into a problem. Please try again."
         default: return "Something went wrong. Please try again."
         }
