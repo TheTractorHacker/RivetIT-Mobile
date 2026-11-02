@@ -171,3 +171,54 @@ final class CompanyLogoTests: XCTestCase {
         XCTAssertNil(none.logoPath)
     }
 }
+
+final class TicketAttachmentTests: XCTestCase {
+    func testAllowedTypePasses() { XCTAssertNil(AttachmentRules.problem(name: "Report.PDF", size: 1024)) }
+    func testDisallowedTypeIsRejected() { XCTAssertNotNil(AttachmentRules.problem(name: "run.exe", size: 1024)) }
+    func testNoExtensionIsRejected() { XCTAssertNotNil(AttachmentRules.problem(name: "README", size: 10)) }
+    func testEmptyIsRejected() { XCTAssertNotNil(AttachmentRules.problem(name: "a.txt", size: 0)) }
+    func testOverServerLimitIsRejected() { XCTAssertNotNil(AttachmentRules.problem(name: "a.zip", size: AttachmentRules.serverMaxBytes + 1)) }
+    func testOverAppLimitIsRejectedWithExplanation() {
+        XCTAssertTrue(AttachmentRules.problem(name: "a.zip", size: AttachmentRules.maxBytesPerReply + 1)?.contains("per reply") == true)
+    }
+    func testSizeFormatting() {
+        XCTAssertEqual(AttachmentRules.humanSize(512), "512 B")
+        XCTAssertEqual(AttachmentRules.humanSize(2 << 20), "2.0 MB")
+    }
+
+    private let server = URL(string: "https://x.example")!
+    func testSameOriginUploadPathIsAccepted() {
+        XCTAssertEqual(ticketAttachmentURL(server: server, path: "/uploads/tickets/12/a.pdf")?.absoluteString, "https://x.example/uploads/tickets/12/a.pdf")
+    }
+    func testOtherHostSchemePathAndTraversalAreRejected() {
+        XCTAssertNil(ticketAttachmentURL(server: server, path: "https://evil.example/uploads/tickets/12/a.pdf"))
+        XCTAssertNil(ticketAttachmentURL(server: server, path: "javascript:alert(1)"))
+        XCTAssertNil(ticketAttachmentURL(server: server, path: "/admin/login.php"))
+        XCTAssertNil(ticketAttachmentURL(server: server, path: "/uploads/tickets/../../etc/passwd"))
+        XCTAssertNil(ticketAttachmentURL(server: server, path: "https://u:p@x.example/uploads/tickets/1/a.pdf"))
+    }
+
+    func testMultipartBodyHasFieldsFilesAndClosingBoundary() {
+        var form = MultipartForm(boundary: "B")
+        form.fields = [("reply", "hi"), ("type", "note")]
+        form.files = [ReplyFile(name: "a\".txt", mimeType: "text/plain", data: Data("DATA".utf8))]
+        let body = String(decoding: form.body(), as: UTF8.self)
+        XCTAssertTrue(body.contains("name=\"reply\"\r\n\r\nhi\r\n"))
+        XCTAssertTrue(body.contains("name=\"files[]\"; filename=\"a_.txt\"\r\nContent-Type: text/plain\r\n\r\nDATA\r\n"))
+        XCTAssertTrue(body.hasSuffix("--B--\r\n"))
+        XCTAssertEqual(form.contentType, "multipart/form-data; boundary=B")
+    }
+
+    func testTicketDecodesAttachmentsOnTicketAndReply() throws {
+        let json = """
+        {"id":1,"number":1,"subject":"s","billable":false,
+         "attachments":[{"name":"a.pdf","url":"/uploads/tickets/1/a.pdf"}],
+         "replies":[{"id":2,"body":"b","type":"Internal","attachments":[{"name":"b.txt","url":"/uploads/tickets/1/b.txt"}]},
+                    {"id":3,"body":"c","type":"reply"}]}
+        """
+        let t = try APIClient.decoder.decode(TicketDetail.self, from: Data(json.utf8))
+        XCTAssertEqual(t.attachments.map(\.name), ["a.pdf"])
+        XCTAssertEqual(t.replies[0].attachments.map(\.name), ["b.txt"])
+        XCTAssertTrue(t.replies[1].attachments.isEmpty)
+    }
+}

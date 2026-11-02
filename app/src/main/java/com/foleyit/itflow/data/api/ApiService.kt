@@ -93,6 +93,15 @@ interface ApiService {
     @POST("crash-reports")
     suspend fun reportCrash(@Body body: CrashReportRequest): Map<String, Boolean>
 
+    // Reply with files in one request: the reply and its attachments are confirmed together.
+    @Multipart
+    @POST("tickets/{id}/reply")
+    suspend fun addReplyWithFiles(
+        @Path("id") id: Int,
+        @PartMap fields: Map<String, @JvmSuppressWildcards okhttp3.RequestBody>,
+        @Part files: List<MultipartBody.Part>
+    ): ReplyWithFilesResult
+
     // Ticket attachment upload
     @Multipart
     @POST("tickets/{id}/attachments")

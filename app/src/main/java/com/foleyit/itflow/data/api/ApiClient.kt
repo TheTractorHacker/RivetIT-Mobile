@@ -85,6 +85,13 @@ object ApiClient {
             .sslSocketFactory(sslContext.socketFactory, trustManager)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            // Multipart uploads can be hundreds of MB: allow the transfer and the server's processing time.
+            .addInterceptor { chain ->
+                if (chain.request().body is okhttp3.MultipartBody)
+                    chain.withWriteTimeout(120, TimeUnit.SECONDS).withReadTimeout(300, TimeUnit.SECONDS)
+                        .proceed(chain.request())
+                else chain.proceed(chain.request())
+            }
             // Offline cache (10 MB)
             .apply {
                 _appContext?.let { ctx ->

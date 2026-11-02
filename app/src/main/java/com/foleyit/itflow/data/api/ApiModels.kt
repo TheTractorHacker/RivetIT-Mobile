@@ -67,7 +67,8 @@ data class TicketDetail(
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("due_at") val dueAt: String?,
     @SerializedName("resolved_at") val resolvedAt: String?,
-    val replies: List<TicketReply>
+    val replies: List<TicketReply>,
+    val attachments: List<TicketAttachment>? = null
 )
 
 data class TicketReply(
@@ -75,8 +76,15 @@ data class TicketReply(
     @SerializedName("time_worked") val timeWorked: String?,
     val onsite: Boolean?,
     val by: String?,
-    @SerializedName("created_at") val createdAt: String?
+    @SerializedName("created_at") val createdAt: String?,
+    val attachments: List<TicketAttachment>? = null
 )
+
+/** A file attached to a ticket or reply. [url] is a server path such as /uploads/tickets/12/x.pdf. */
+data class TicketAttachment(val name: String, val url: String)
+
+/** Reply created with files: [attachments] lists only those the server actually stored. */
+data class ReplyWithFilesResult(val id: Int? = null, val attachments: List<TicketAttachment>? = null)
 
 data class AddReplyRequest(val reply: String, val type: String, val time_worked: String?, val onsite: Int = 0, val status_id: Int? = null)
 data class TicketStatus(val id: Int, val name: String, val color: String)

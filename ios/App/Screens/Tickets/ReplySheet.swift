@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import RivetCore
 
 /// Reply / internal note / time entry / status change in one sheet. Waits for the server before closing, blocks repeat
@@ -8,6 +9,8 @@ import RivetCore
     let statuses: [TicketStatus]
     var initialMinutes: Int = 0
     var onSent: () -> Void
+    /// Called when the reply was saved but the server stored fewer files than were sent.
+    var onPartial: ((String) -> Void)? = nil
 
     @EnvironmentObject var session: Session
     @Environment(\.dismiss) private var dismiss
@@ -19,9 +22,14 @@ import RivetCore
     @State private var statusIndex = 0
     @State private var sending = false
     @State private var error: String?
+    @State private var files: [ReplyFile] = []
+    @State private var showImporter = false
+    @State private var attachProblem: String?
     @FocusState private var editorFocused: Bool
 
     private var primaryTitle: String { isPublic ? "Send public reply" : "Add internal note" }
+    private var canAttach: Bool { session.capabilities.canWrite(Capabilities.support) }
+    private var attachedBytes: Int { files.reduce(0) { $0 + $1.data.count } }
     private var canSubmit: Bool { !sending && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
@@ -59,6 +67,7 @@ import RivetCore
                         Text("Set status (optional)").font(.footnote.weight(.semibold)).foregroundColor(Palette.label2)
                         FilterChips(items: ["No change"] + statuses.map(\.name), selection: $statusIndex).padding(.horizontal, -16)
                     }
+                    if canAttach { attachments }
                     if let error { InlineError(message: error) }
                 }.padding(20)
             }
@@ -78,6 +87,47 @@ import RivetCore
         .interactiveDismissDisabled(sending)
         .onAppear {
             minutes = ((initialMinutes % 60) / 5) * 5; hours = initialMinutes / 60
+        }
+    }
+
+    private var attachments: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Attachments (optional)").font(.footnote.weight(.semibold)).foregroundColor(Palette.label2)
+            ForEach(files, id: \.self) { f in
+                HStack {
+                    Image(systemName: "paperclip").foregroundColor(Palette.label2)
+                    Text("\(f.name) · \(AttachmentRules.humanSize(f.data.count))").font(.subheadline).lineLimit(1)
+                    Spacer()
+                    Button { files.removeAll { $0 == f } } label: { Image(systemName: "xmark.circle.fill").foregroundColor(Palette.label3) }
+                        .disabled(sending).accessibilityLabel("Remove \(f.name)")
+                }
+            }
+            Button { showImporter = true } label: { Label(files.isEmpty ? "Attach files" : "Add more", systemImage: "paperclip") }
+                .disabled(sending)
+            if let attachProblem { Text(attachProblem).font(.footnote).foregroundColor(.red) }
+            if sending && !files.isEmpty {
+                HStack(spacing: 8) { ProgressView(); Text("Uploading…").font(.footnote).foregroundColor(Palette.label2) }
+            }
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            var problems: [String] = []
+            for url in urls {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let name = url.lastPathComponent
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+                if files.contains(where: { $0.name == name }) { continue }          // a repeat pick of the same file
+                if files.count >= AttachmentRules.maxFiles { problems.append("At most \(AttachmentRules.maxFiles) files per reply"); break }
+                if let p = AttachmentRules.problem(name: name, size: size) { problems.append(p); continue }
+                if attachedBytes + size > AttachmentRules.maxBytesPerReply {
+                    problems.append("Attachments are limited to \(AttachmentRules.humanSize(AttachmentRules.maxBytesPerReply)) per reply"); continue
+                }
+                guard let data = try? Data(contentsOf: url) else { problems.append("Could not read \"\(name)\""); continue }
+                let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+                files.append(ReplyFile(name: name, mimeType: mime, data: data))
+            }
+            attachProblem = problems.first
         }
     }
 
@@ -106,12 +156,21 @@ import RivetCore
         Task {
             defer { sending = false }
             do {
-                try await api.addReply(ticketId: ticketId, body)
+                if files.isEmpty {
+                    try await api.addReply(ticketId: ticketId, body)
+                } else {
+                    let result = try await api.addReply(ticketId: ticketId, body, files: files)
+                    let stored = result.attachments?.count ?? 0
+                    if stored < files.count {
+                        // The reply is saved, so the sheet closes; the detail view then reloads. Say which part failed.
+                        onPartial?("Reply posted, but \(files.count - stored) of \(files.count) attachment(s) were rejected by the server.")
+                    }
+                }
                 onSent(); dismiss()
             } catch let e as RivetError {
                 if case .network = e {
                     // The request may or may not have reached the server: never retry blindly.
-                    error = "Could not confirm the save. Check the ticket history before trying again: " + userMessage(for: e)
+                    error = "Could not confirm the save. Check the ticket history before trying again" + (files.isEmpty ? "" : " (your draft and files are kept)") + ": " + userMessage(for: e)
                 } else { error = userMessage(for: e) }
             } catch { self.error = userMessage(for: error) }
         }

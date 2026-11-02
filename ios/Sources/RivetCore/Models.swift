@@ -120,8 +120,9 @@ public struct TicketReply: Decodable, Identifiable, Hashable {
     public let onsite: Bool?
     public let by: String?
     public let createdAt: String?
+    public let attachments: [TicketAttachment]
 
-    enum CodingKeys: String, CodingKey { case id, body, type, timeWorked, onsite, by, createdAt }
+    enum CodingKeys: String, CodingKey { case id, body, type, timeWorked, onsite, by, createdAt, attachments }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
@@ -131,6 +132,7 @@ public struct TicketReply: Decodable, Identifiable, Hashable {
         onsite = LossyBool.decode(c, .onsite)
         by = try c.decodeIfPresent(String.self, forKey: .by)
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        attachments = try c.decodeIfPresent([TicketAttachment].self, forKey: .attachments) ?? []
     }
 }
 
@@ -152,10 +154,11 @@ public struct TicketDetail: Decodable, Hashable {
     public let dueAt: String?
     public let resolvedAt: String?
     public let replies: [TicketReply]
+    public let attachments: [TicketAttachment]
 
     enum CodingKeys: String, CodingKey {
         case id, number, subject, details, priority, status, statusColor, client, assignedTo, contactName,
-             contactEmail, contactPhone, billable, createdAt, dueAt, resolvedAt, replies
+             contactEmail, contactPhone, billable, createdAt, dueAt, resolvedAt, replies, attachments
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -176,6 +179,7 @@ public struct TicketDetail: Decodable, Hashable {
         dueAt = try c.decodeIfPresent(String.self, forKey: .dueAt)
         resolvedAt = try c.decodeIfPresent(String.self, forKey: .resolvedAt)
         replies = try c.decodeIfPresent([TicketReply].self, forKey: .replies) ?? []
+        attachments = try c.decodeIfPresent([TicketAttachment].self, forKey: .attachments) ?? []
     }
 }
 
