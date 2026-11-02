@@ -171,7 +171,11 @@ private func assetSymbol(_ type: String?) -> String {
         ZStack(alignment: .bottom) {
             Group {
                 switch permission {
-                case .authorized: ScannerPreview(onCode: handle).id(scanKey).ignoresSafeArea()
+                case .authorized:
+                    ZStack {
+                        ScannerPreview(onCode: handle).id(scanKey).ignoresSafeArea()
+                        ViewfinderOverlay(active: !looking && message == nil).ignoresSafeArea()
+                    }
                 case .notDetermined: LoadingStateView()
                 default:
                     VStack(spacing: 12) {
@@ -214,6 +218,58 @@ private func assetSymbol(_ type: String?) -> String {
     }
 }
 
+/// Where the barcode has to sit. The overlay draws it and the camera only reads codes inside it, so they must agree.
+enum ScannerGeometry {
+    static func box(in size: CGSize) -> CGRect {
+        let width = max(180, min(size.width - 64, 340))
+        let height = width * 0.62
+        return CGRect(x: (size.width - width) / 2, y: size.height * 0.42 - height / 2, width: width, height: height)
+    }
+}
+
+private struct CornerBrackets: Shape {
+    var length: CGFloat = 30
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        for (corner, dx, dy) in [(CGPoint(x: r.minX, y: r.minY), 1.0, 1.0), (CGPoint(x: r.maxX, y: r.minY), -1.0, 1.0),
+                                 (CGPoint(x: r.minX, y: r.maxY), 1.0, -1.0), (CGPoint(x: r.maxX, y: r.maxY), -1.0, -1.0)] {
+            p.move(to: CGPoint(x: corner.x + dx * length, y: corner.y))
+            p.addLine(to: corner)
+            p.addLine(to: CGPoint(x: corner.x, y: corner.y + dy * length))
+        }
+        return p
+    }
+}
+
+/// Dimmed camera with a clear box and corner brackets, plus a one-line instruction.
+private struct ViewfinderOverlay: View {
+    var active: Bool
+    var body: some View {
+        GeometryReader { geo in
+            let box = ScannerGeometry.box(in: geo.size)
+            ZStack {
+                Path { p in
+                    p.addRect(CGRect(origin: .zero, size: geo.size))
+                    p.addRoundedRect(in: box, cornerSize: CGSize(width: 18, height: 18))
+                }
+                .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+                CornerBrackets().stroke(active ? Color.white : Color.white.opacity(0.4),
+                                        style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    .frame(width: box.width, height: box.height)
+                    .position(x: box.midX, y: box.midY)
+                Text("Align the barcode or QR code inside the box")
+                    .font(.subheadline.weight(.medium)).foregroundColor(.white).multilineTextAlignment(.center)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Color.black.opacity(0.55), in: Capsule())
+                    .position(x: geo.size.width / 2, y: box.maxY + 36)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Camera view. Align the barcode or QR code inside the box.")
+    }
+}
+
 private struct ScannerPreview: UIViewControllerRepresentable {
     var onCode: (String) -> Void
 
@@ -227,6 +283,8 @@ private final class ScannerController: UIViewController, AVCaptureMetadataOutput
     var onCode: ((String) -> Void)?
     private let session = AVCaptureSession()
     private var delivered = false
+    private var output: AVCaptureMetadataOutput?
+    private var previewLayer: AVCaptureVideoPreviewLayer?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -242,12 +300,17 @@ private final class ScannerController: UIViewController, AVCaptureMetadataOutput
         preview.videoGravity = .resizeAspectFill
         preview.frame = view.bounds
         view.layer.addSublayer(preview)
+        self.output = output; self.previewLayer = preview
         DispatchQueue.global(qos: .userInitiated).async { [session] in session.startRunning() }
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        view.layer.sublayers?.first { $0 is AVCaptureVideoPreviewLayer }?.frame = view.bounds
+        previewLayer?.frame = view.bounds
+        // Only read codes inside the on-screen box, so aligning it matters.
+        if let previewLayer, let output {
+            output.rectOfInterest = previewLayer.metadataOutputRectConverted(fromLayerRect: ScannerGeometry.box(in: view.bounds.size))
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
