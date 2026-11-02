@@ -28,6 +28,19 @@ targets:
       properties:
         CFBundleDisplayName: RivetIT
         UILaunchScreen: {}
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.newTicket
+            UIApplicationShortcutItemTitle: New ticket
+            UIApplicationShortcutItemIconSymbolName: plus.circle
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.scan
+            UIApplicationShortcutItemTitle: Scan barcode
+            UIApplicationShortcutItemIconSymbolName: qrcode.viewfinder
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.myTickets
+            UIApplicationShortcutItemTitle: My tickets
+            UIApplicationShortcutItemIconSymbolName: person.crop.circle
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.search
+            UIApplicationShortcutItemTitle: Search
+            UIApplicationShortcutItemIconSymbolName: magnifyingglass
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

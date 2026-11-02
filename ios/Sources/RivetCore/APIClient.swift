@@ -117,6 +117,7 @@ public final class APIClient: @unchecked Sendable {
 
 private struct Empty: Encodable {}
 private struct StatusBody: Encodable { var statusId: Int }
+private struct RegisterKeyBody: Encodable { var devicePublicKeyPem: String }
 
 public extension APIClient {
     // Auth & profile
@@ -215,6 +216,24 @@ public extension APIClient {
     func contract(_ id: Int) async throws -> ContractDetail { try await get("contracts/\(id)") }
 
     // Credentials (list only; secrets need the biometric challenge flow)
+    /// Step 1 of revealing a credential: a fresh challenge from the server.
+    func biometricChallenge() async throws -> BiometricChallenge { try await get("auth") }
+
+    /// Registers this device's signing key (idempotent; the server keeps one per user, like the Android app).
+    func registerBiometricKey(pem: String) async throws {
+        try await sendVoid("PUT", "me", body: RegisterKeyBody(devicePublicKeyPem: pem))
+    }
+
+    /// Step 3: the credential with its secrets, proven by the signature over the challenge.
+    func credential(id: Int, challengeToken: String, signature: String) async throws -> CredentialDetail {
+        var request = try makeRequest("GET", "credentials/\(id)")
+        request.setValue(challengeToken, forHTTPHeaderField: "X-Biometric-Challenge-Token")
+        request.setValue(signature, forHTTPHeaderField: "X-Biometric-Signature")
+        let data = try await perform(request: request)
+        do { return try APIClient.decoder.decode(CredentialDetail.self, from: data) }
+        catch { throw RivetError.decoding(String(describing: error)) }
+    }
+
     func credentials(search: String = "", page: Int = 1) async throws -> Paged<CredentialSummary> {
         try await get("credentials", query: ["search": search, "page": String(page)])
     }

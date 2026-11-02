@@ -81,7 +81,7 @@ public enum AppRoute: Equatable, Hashable {
     case assets, asset(Int)
     case projects, project(Int)
     case contracts, contract(Int)
-    case credentials, notifications, appointments, search, reports, scan, profile, alerts
+    case credentials, credential(Int), notifications, appointments, search, reports, scan, profile, alerts
     case kb, kbArticle(Int)
     /// In-app only (the new-ticket form); never produced by `DeepLinks.resolve`.
     case createTicket
@@ -112,7 +112,7 @@ public enum DeepLinks {
         case "projects": return id.map(AppRoute.project) ?? .projects
         case "contracts": return id.map(AppRoute.contract) ?? .contracts
         case "kb": return id.map(AppRoute.kbArticle) ?? .kb
-        case "credentials": return .credentials
+        case "credentials": return id.map(AppRoute.credential) ?? .credentials
         case "notifications": return .notifications
         case "appointments": return .appointments
         case "search": return .search
@@ -121,6 +121,29 @@ public enum DeepLinks {
         case "profile": return .profile
         case "alerts": return .alerts
         default: return nil   // worksheets / outtakes
+        }
+    }
+}
+
+// MARK: - Home Screen quick actions
+
+/// The actions shown when the app icon is touched and held. Raw values match `UIApplicationShortcutItemType` in project.yml.
+public enum QuickAction: String, CaseIterable {
+    case newTicket = "com.foleyit.itflow.ios.newTicket"
+    case scan = "com.foleyit.itflow.ios.scan"
+    case myTickets = "com.foleyit.itflow.ios.myTickets"
+    case search = "com.foleyit.itflow.ios.search"
+
+    /// Unknown or tampered shortcut types resolve to nil and are ignored.
+    public init?(type: String) { self.init(rawValue: type) }
+
+    /// The screen to open; `.myTickets` opens the ticket list, which the app then filters to the user's own.
+    public var route: AppRoute {
+        switch self {
+        case .newTicket: return .createTicket
+        case .scan: return .scan
+        case .myTickets: return .tickets
+        case .search: return .search
         }
     }
 }

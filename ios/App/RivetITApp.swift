@@ -4,6 +4,7 @@ import RivetCore
 
 @main
 struct RivetITApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var session = Session()
 
     var body: some Scene {
@@ -41,7 +42,9 @@ struct RivetITApp: App {
             let parts = ([url.host ?? ""] + url.pathComponents.filter { $0 != "/" }).filter { !$0.isEmpty }
             session.pendingDeepLink = parts.joined(separator: "/")
         }
+        .onReceive(NotificationCenter.default.publisher(for: QuickActionInbox.received)) { _ in takeShortcut() }
         .onAppear {
+            takeShortcut()
             if !launchChecked {
                 launchChecked = true
                 if session.biometricLock && session.phase == .main { locked = true }
@@ -51,12 +54,17 @@ struct RivetITApp: App {
             switch phase {
             case .background: backgroundedAt = Date()
             case .active:
+                takeShortcut()
                 Task { await session.loadBranding() }
                 if session.biometricLock, session.phase == .main, let t = backgroundedAt, Date().timeIntervalSince(t) > 300 { locked = true }
                 backgroundedAt = nil
             default: break
             }
         }
+    }
+
+    private func takeShortcut() {
+        if let type = QuickActionInbox.shared.take() { session.pendingShortcut = type }
     }
 }
 

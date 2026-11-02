@@ -52,6 +52,8 @@ final class Session: ObservableObject {
     @Published var notice: String?
     /// A `rivetit://…` link received before the user was signed in; followed once the main screen is showing.
     @Published var pendingDeepLink: String?
+    /// A Home Screen quick action received before the main screen was showing.
+    @Published var pendingShortcut: String?
     @Published var themeMode: ThemeMode {
         didSet { UserDefaults.standard.set(themeMode.rawValue, forKey: Keys.theme) }
     }

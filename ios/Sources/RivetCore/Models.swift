@@ -621,6 +621,24 @@ public struct CredentialSummary: Decodable, Identifiable, Hashable {
     public let client: String?
 }
 
+/// A credential with its secrets, returned only after a signed biometric challenge.
+public struct CredentialDetail: Decodable, Identifiable, Hashable {
+    public let id: Int
+    public let name: String
+    public let username: String?
+    public let password: String?
+    public let uri: String?
+    public let uri2: String?
+    public let note: String?
+    public let client: String?
+}
+
+/// `GET /api/v1/auth` with no credentials: a fresh single-use challenge used to prove a biometric unlock.
+public struct BiometricChallenge: Decodable {
+    public let challenge: String
+    public let challengeToken: String
+}
+
 // MARK: Notifications, alerts, appointments
 
 public struct AppNotification: Decodable, Identifiable, Hashable {
