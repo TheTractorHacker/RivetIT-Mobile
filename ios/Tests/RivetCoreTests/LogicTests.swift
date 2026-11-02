@@ -220,6 +220,9 @@ final class TicketAttachmentTests: XCTestCase {
         XCTAssertEqual(t.attachments.map(\.name), ["a.pdf"])
         XCTAssertEqual(t.replies[0].attachments.map(\.name), ["b.txt"])
         XCTAssertTrue(t.replies[1].attachments.isEmpty)
+    }
+}
+
 final class LoginResponseTests: XCTestCase {
     private func decode(_ json: String) throws -> LoginResponse { try APIClient.decoder.decode(LoginResponse.self, from: Data(json.utf8)) }
 
