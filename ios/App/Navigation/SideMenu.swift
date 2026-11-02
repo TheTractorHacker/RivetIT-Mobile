@@ -3,10 +3,19 @@ import RivetCore
 
 /// The Android navigation drawer: profile header, destinations (hidden when the role cannot use them), theme, sign out.
 @MainActor struct SideMenu: View {
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject var session: Session
     @EnvironmentObject var router: Router
 
     private var caps: Capabilities { session.capabilities }
+
+    private var isDark: Bool {
+        switch session.themeMode {
+        case .dark: return true
+        case .light: return false
+        case .system: return colorScheme == .dark
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,8 +38,9 @@ import RivetCore
                 Divider().padding(.bottom, 8).padding(.horizontal, 14)
                 item("Profile", "person") { router.open(.profile) }
                 HStack(spacing: 16) {
-                    Image(systemName: session.themeMode == .dark ? "moon" : "sun.max").frame(width: 24)
-                    Toggle("Dark mode", isOn: Binding(get: { session.themeMode == .dark },
+                    Image(systemName: isDark ? "moon" : "sun.max").frame(width: 24)
+                    // "System" follows the phone, so the switch shows what is actually on screen, not just an explicit choice.
+                    Toggle("Dark mode", isOn: Binding(get: { isDark },
                                                       set: { session.themeMode = $0 ? .dark : .light }))
                         .tint(Palette.brand)
                 }.padding(.horizontal, 14).frame(height: 50)
