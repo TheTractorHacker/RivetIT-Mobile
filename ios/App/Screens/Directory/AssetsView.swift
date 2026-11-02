@@ -165,6 +165,7 @@ private func assetSymbol(_ type: String?) -> String {
     @State private var permission: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var message: String?
     @State private var looking = false
+    @State private var scanned = ""
     @State private var scanKey = 0
 
     var body: some View {
@@ -173,7 +174,7 @@ private func assetSymbol(_ type: String?) -> String {
                 switch permission {
                 case .authorized:
                     ZStack {
-                        ScannerPreview(onCode: handle).id(scanKey).ignoresSafeArea()
+                        ScannerPreview(onCode: handle, onUnavailable: { message = "The camera is not available on this device." }).id(scanKey).ignoresSafeArea()
                         ViewfinderOverlay(active: !looking && message == nil).ignoresSafeArea()
                     }
                 case .notDetermined: LoadingStateView()
@@ -184,7 +185,7 @@ private func assetSymbol(_ type: String?) -> String {
                     }
                 }
             }
-            if looking { ProgressView("Looking up…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(.bottom, 40) }
+            if looking { ProgressView("Looking up “\(scanned)”…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(.bottom, 40) }
             else if let message {
                 VStack(spacing: 8) {
                     Text(message).font(.subheadline).multilineTextAlignment(.center)
@@ -202,7 +203,9 @@ private func assetSymbol(_ type: String?) -> String {
     }
 
     private func handle(_ code: String) {
-        guard !looking, message == nil, let api = session.api else { return }
+        guard !looking, message == nil else { return }
+        guard let api = session.api else { message = "You are not signed in. Sign in again, then scan."; return }
+        scanned = code
         looking = true
         Task {
             defer { looking = false }
@@ -211,9 +214,13 @@ private func assetSymbol(_ type: String?) -> String {
                 if let exact = found.first(where: { $0.tag == code || $0.serial == code }) ?? (found.count == 1 ? found.first : nil) {
                     router.pop(); router.push(.asset(exact.id))
                 } else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     message = found.isEmpty ? "No asset found for “\(code)”." : "\(found.count) assets match “\(code)”. Try a more specific code."
                 }
-            } catch { message = userMessage(for: error) }
+            } catch {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                message = "Could not look up “\(code)”. " + userMessage(for: error)
+            }
         }
     }
 }
@@ -274,15 +281,17 @@ private struct ViewfinderOverlay: View {
 
 private struct ScannerPreview: UIViewControllerRepresentable {
     var onCode: (String) -> Void
+    var onUnavailable: () -> Void
 
     func makeUIViewController(context: Context) -> ScannerController {
-        let c = ScannerController(); c.onCode = onCode; return c
+        let c = ScannerController(); c.onCode = onCode; c.onUnavailable = onUnavailable; return c
     }
     func updateUIViewController(_ uiViewController: ScannerController, context: Context) {}
 }
 
 private final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     var onCode: ((String) -> Void)?
+    var onUnavailable: (() -> Void)?
     private let session = AVCaptureSession()
     private var delivered = false
     private var output: AVCaptureMetadataOutput?
@@ -291,10 +300,16 @@ private final class ScannerController: UIViewController, AVCaptureMetadataOutput
     override func viewDidLoad() {
         super.viewDidLoad()
         guard let device = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else { return }   // e.g. the Simulator has no camera
+              session.canAddInput(input) else {   // e.g. the Simulator has no camera
+            DispatchQueue.main.async { [weak self] in self?.onUnavailable?() }
+            return
+        }
         session.addInput(input)
         let output = AVCaptureMetadataOutput()
-        guard session.canAddOutput(output) else { return }
+        guard session.canAddOutput(output) else {
+            DispatchQueue.main.async { [weak self] in self?.onUnavailable?() }
+            return
+        }
         session.addOutput(output)
         output.setMetadataObjectsDelegate(self, queue: .main)
         output.metadataObjectTypes = [.qr, .code128, .code39, .code93, .ean13, .ean8, .upce, .dataMatrix, .pdf417]
@@ -309,10 +324,6 @@ private final class ScannerController: UIViewController, AVCaptureMetadataOutput
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.bounds
-        // Only read codes inside the on-screen box, so aligning it matters.
-        if let previewLayer, let output {
-            output.rectOfInterest = previewLayer.metadataOutputRectConverted(fromLayerRect: ScannerGeometry.box(in: view.bounds.size))
-        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -321,9 +332,17 @@ private final class ScannerController: UIViewController, AVCaptureMetadataOutput
     }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard !delivered, let code = (metadataObjects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }
-        delivered = true
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onCode?(code)
+        guard !delivered else { return }
+        // Only accept a code that sits in the on-screen box (a little slack around it), so aligning it matters.
+        let box = ScannerGeometry.box(in: view.bounds.size).insetBy(dx: -24, dy: -24)
+        for case let object as AVMetadataMachineReadableCodeObject in metadataObjects {
+            guard let code = object.stringValue, !code.isEmpty else { continue }
+            if let layer = previewLayer, let seen = layer.transformedMetadataObject(for: object),
+               !box.contains(CGPoint(x: seen.bounds.midX, y: seen.bounds.midY)) { continue }
+            delivered = true
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onCode?(code)
+            return
+        }
     }
 }
