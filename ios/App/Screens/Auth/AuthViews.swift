@@ -115,6 +115,27 @@ import RivetCore
     }
 }
 
+/// A captioned, filled input row used by the sign-in form.
+@MainActor private struct FormRow<Field: View>: View {
+    let title: String
+    let systemImage: String
+    let field: Field
+    init(_ title: String, systemImage: String, @ViewBuilder field: () -> Field) {
+        self.title = title; self.systemImage = systemImage; self.field = field()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.footnote.weight(.semibold)).foregroundColor(Palette.label2)
+            HStack(spacing: 12) {
+                Image(systemName: systemImage).foregroundColor(Palette.label2).frame(width: 22)
+                field
+            }
+            .padding(.horizontal, 14).frame(minHeight: 50)
+            .background(Palette.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+}
+
 @MainActor struct LoginView: View {
     @EnvironmentObject var session: Session
     @State private var username = ""
@@ -124,61 +145,93 @@ import RivetCore
     @State private var needsCode = false
     @State private var loading = false
     @State private var error: String?
+    @FocusState private var focus: Field?
+    private enum Field { case username, password, code }
+
+    private var canSubmit: Bool {
+        !loading && !username.isEmpty && !password.isEmpty && (!needsCode || !code.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                BrandMark(size: 76).padding(.top, 70)
-                Text("Sign in").font(.largeTitle.weight(.bold)).padding(.top, 24)
-                Text(session.serverDisplay).font(.footnote.monospaced()).foregroundColor(Palette.label2).padding(.top, 4)
+                VStack(spacing: 12) {
+                    BrandMark(size: 84)
+                    Text(session.branding.name).font(.title2.weight(.bold)).multilineTextAlignment(.center)
+                    Text("Sign in to continue").font(.subheadline).foregroundColor(Palette.label2)
+                    Label(session.serverDisplay, systemImage: "lock.shield").font(.caption.monospaced())
+                        .foregroundColor(Palette.label2).lineLimit(1).truncationMode(.middle)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Palette.fill, in: Capsule())
+                        .accessibilityLabel("Server \(session.serverDisplay)")
+                }.padding(.top, 48).padding(.bottom, 28)
 
-                if let notice = session.notice { InlineError(message: notice).padding(.top, 14) }
+                if let notice = session.notice { InlineError(message: notice).padding(.bottom, 12) }
 
-                LabeledField(systemImage: "person") {
-                    TextField("Username or email", text: $username)
-                        .textContentType(.username).keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                }.padding(.top, 30)
-
-                LabeledField(systemImage: "lock") {
-                    Group {
-                        if showPassword { TextField("Password", text: $password) } else { SecureField("Password", text: $password) }
-                    }.textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .submitLabel(.go).onSubmit { signIn() }
-                    Button { showPassword.toggle() } label: { Image(systemName: showPassword ? "eye.slash" : "eye").foregroundColor(Palette.label2) }
-                        .accessibilityLabel(showPassword ? "Hide password" : "Show password")
-                }.padding(.top, 12)
-
-                if needsCode {
-                    LabeledField(systemImage: "number") {
-                        TextField("Authentication code", text: $code).keyboardType(.numberPad).textContentType(.oneTimeCode)
-                    }.padding(.top, 12)
+                VStack(spacing: 16) {
+                    FormRow("Username or email", systemImage: "person") {
+                        TextField("name@company.com", text: $username)
+                            .textContentType(.username).keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .focused($focus, equals: .username).submitLabel(.next)
+                            .onSubmit { focus = .password }
+                    }
+                    FormRow("Password", systemImage: "lock") {
+                        Group {
+                            if showPassword { TextField("Password", text: $password) } else { SecureField("Password", text: $password) }
+                        }
+                        .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .focused($focus, equals: .password).submitLabel(needsCode ? .next : .go)
+                        .onSubmit { if needsCode { focus = .code } else { signIn() } }
+                        Button { showPassword.toggle() } label: {
+                            Image(systemName: showPassword ? "eye.slash" : "eye").foregroundColor(Palette.label2)
+                        }.accessibilityLabel(showPassword ? "Hide password" : "Show password")
+                    }
+                    if needsCode {
+                        VStack(alignment: .leading, spacing: 6) {
+                            FormRow("Authentication code", systemImage: "number") {
+                                TextField("6-digit code or recovery code", text: $code)
+                                    .keyboardType(.asciiCapable).textContentType(.oneTimeCode)
+                                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                                    .focused($focus, equals: .code).submitLabel(.go)
+                                    .onSubmit { signIn() }
+                            }
+                            Text("Open your authenticator app, or use a recovery code.")
+                                .font(.caption).foregroundColor(Palette.label2)
+                        }
+                    }
+                    if let error { InlineError(message: error) }
+                    Button { signIn() } label: {
+                        if loading { ProgressView().tint(Palette.onBrand) } else { Text(needsCode ? "Verify and sign in" : "Sign in") }
+                    }
+                    .buttonStyle(PrimaryButtonStyle()).disabled(!canSubmit).opacity(canSubmit ? 1 : 0.55)
                 }
+                .padding(20)
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
 
-                if let error { InlineError(message: error).padding(.top, 10) }
-
-                Button { signIn() } label: {
-                    if loading { ProgressView().tint(Palette.onBrand) } else { Text("Sign in") }
-                }
-                .buttonStyle(PrimaryButtonStyle()).disabled(loading || username.isEmpty || password.isEmpty).padding(.top, 20)
-
-                Button("Change server") { Task { await session.changeServer() } }.padding(.top, 20)
-            }.padding(.horizontal, 24)
+                Button("Use a different server") { Task { await session.changeServer() } }
+                    .font(.subheadline.weight(.medium)).padding(.top, 22)
+            }
+            .frame(maxWidth: 440)
+            .padding(.horizontal, 20).padding(.bottom, 30)
+            .frame(maxWidth: .infinity)
         }
         .background(Palette.background.ignoresSafeArea())
         .scrollDismissesKeyboard(.interactively)
     }
 
     private func signIn() {
-        guard !loading else { return }
+        guard canSubmit else { return }
         loading = true; error = nil
         Task {
             defer { loading = false }
             do {
                 switch try await session.signIn(username: username.trimmingCharacters(in: .whitespaces), password: password,
-                                                totp: needsCode ? code : nil) {
+                                                totp: needsCode ? code.trimmingCharacters(in: .whitespaces) : nil) {
                 case .signedIn: break
-                case .needsTwoFactor: needsCode = true; error = "Your password was accepted. Enter the code from your authenticator app to finish signing in."
+                case .needsTwoFactor:
+                    needsCode = true; focus = .code
+                    error = "Your password was accepted. Enter the code from your authenticator app to finish signing in."
                 }
             } catch { self.error = userMessage(for: error) }
         }

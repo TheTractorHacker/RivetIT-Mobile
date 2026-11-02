@@ -108,7 +108,12 @@ import RivetCore
                             Image(systemName: "line.3.horizontal")
                         }.accessibilityLabel("Menu")
                         BrandMark(size: 28)
-                        Text(session.branding.name).font(.title3.weight(.medium)).foregroundColor(Palette.label).lineLimit(1)
+                        // An uploaded logo already carries the company name; a long name next to it pushed the search,
+                        // alerts and bell buttons off the bar.
+                        if session.branding.logo == nil {
+                            Text(session.branding.name).font(.title3.weight(.medium)).foregroundColor(Palette.label)
+                                .lineLimit(1).frame(maxWidth: 160, alignment: .leading)
+                        }
                     }
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
