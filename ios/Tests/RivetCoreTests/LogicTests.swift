@@ -220,5 +220,22 @@ final class TicketAttachmentTests: XCTestCase {
         XCTAssertEqual(t.attachments.map(\.name), ["a.pdf"])
         XCTAssertEqual(t.replies[0].attachments.map(\.name), ["b.txt"])
         XCTAssertTrue(t.replies[1].attachments.isEmpty)
+final class LoginResponseTests: XCTestCase {
+    private func decode(_ json: String) throws -> LoginResponse { try APIClient.decoder.decode(LoginResponse.self, from: Data(json.utf8)) }
+
+    func testTwoFactorRequiredIsRecognised() throws {
+        let r = try decode(#"{"requires_2fa":true}"#)
+        XCTAssertEqual(r.requires2fa, true)
+        XCTAssertNil(r.token)
+    }
+    func testTwoFactorFlagSurvivesOtherSpellings() throws {
+        XCTAssertEqual(try decode(#"{"requires2fa":true}"#).requires2fa, true)
+        XCTAssertEqual(try decode(#"{"requires2Fa":true}"#).requires2fa, true)
+    }
+    func testTokenAndUserStillDecode() throws {
+        let r = try decode(#"{"token":"abc","user":{"id":9,"name":"Alex","email":"a@x.example","type":1}}"#)
+        XCTAssertEqual(r.token, "abc")
+        XCTAssertEqual(r.user?.name, "Alex")
+        XCTAssertNil(r.requires2fa)
     }
 }

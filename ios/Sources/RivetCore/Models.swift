@@ -25,7 +25,32 @@ public struct UserInfo: Decodable, Hashable {
 public struct LoginResponse: Decodable {
     public let token: String?
     public let user: UserInfo?
+    /// True when the server wants a 2FA code (`{"requires_2fa": true}`) before it issues a token.
     public let requires2fa: Bool?
+
+    public init(token: String? = nil, user: UserInfo? = nil, requires2fa: Bool? = nil) {
+        self.token = token; self.user = user; self.requires2fa = requires2fa
+    }
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    /// The 2FA flag is matched by its letters and digits only, so it is found however the decoder's snake_case
+    /// conversion spells `requires_2fa`. A missed flag looked exactly like a bad password.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyKey.self)
+        token = try c.decodeIfPresent(String.self, forKey: AnyKey(stringValue: "token")!)
+        user = try c.decodeIfPresent(UserInfo.self, forKey: AnyKey(stringValue: "user")!)
+        var flag: Bool?
+        for key in c.allKeys where key.stringValue.lowercased().replacingOccurrences(of: "_", with: "") == "requires2fa" {
+            flag = try? c.decode(Bool.self, forKey: key)
+        }
+        requires2fa = flag
+    }
 }
 
 public struct ModuleFlags: Decodable, Hashable {

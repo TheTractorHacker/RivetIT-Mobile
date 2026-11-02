@@ -127,7 +127,7 @@ final class Session: ObservableObject {
         guard let api else { throw RivetError.invalidURL }
         let r = try await api.login(username: username, password: password, deviceName: UIDevice.current.name, totp: totp)
         if r.requires2fa == true, r.token == nil { return .needsTwoFactor }
-        guard let token = r.token else { throw RivetError.http(status: 401, message: "Invalid username or password.") }
+        guard let token = r.token else { throw RivetError.http(status: 200, message: "The server accepted the sign-in but did not send a session token. Update the server or the app, then try again.") }
         Keychain.set(token, for: Keys.token)
         api.token = token
         notice = nil
