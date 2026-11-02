@@ -136,6 +136,7 @@ import RivetCore
     }
 }
 
+/// Sign-in is two steps: email + password, then (only for accounts with 2FA) a separate verification screen.
 @MainActor struct LoginView: View {
     @EnvironmentObject var session: Session
     @State private var username = ""
@@ -149,68 +150,16 @@ import RivetCore
     private enum Field { case username, password, code }
 
     private var canSubmit: Bool {
-        !loading && !username.isEmpty && !password.isEmpty && (!needsCode || !code.trimmingCharacters(in: .whitespaces).isEmpty)
+        if loading { return false }
+        if needsCode { return !code.trimmingCharacters(in: .whitespaces).isEmpty }
+        return !username.isEmpty && !password.isEmpty
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                VStack(spacing: 12) {
-                    BrandMark(size: 84)
-                    Text(session.branding.name).font(.title2.weight(.bold)).multilineTextAlignment(.center)
-                    Text("Sign in to continue").font(.subheadline).foregroundColor(Palette.label2)
-                    Label(session.serverDisplay, systemImage: "lock.shield").font(.caption.monospaced())
-                        .foregroundColor(Palette.label2).lineLimit(1).truncationMode(.middle)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(Palette.fill, in: Capsule())
-                        .accessibilityLabel("Server \(session.serverDisplay)")
-                }.padding(.top, 48).padding(.bottom, 28)
-
-                if let notice = session.notice { InlineError(message: notice).padding(.bottom, 12) }
-
-                VStack(spacing: 16) {
-                    FormRow("Username or email", systemImage: "person") {
-                        TextField("name@company.com", text: $username)
-                            .textContentType(.username).keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .focused($focus, equals: .username).submitLabel(.next)
-                            .onSubmit { focus = .password }
-                    }
-                    FormRow("Password", systemImage: "lock") {
-                        Group {
-                            if showPassword { TextField("Password", text: $password) } else { SecureField("Password", text: $password) }
-                        }
-                        .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .focused($focus, equals: .password).submitLabel(needsCode ? .next : .go)
-                        .onSubmit { if needsCode { focus = .code } else { signIn() } }
-                        Button { showPassword.toggle() } label: {
-                            Image(systemName: showPassword ? "eye.slash" : "eye").foregroundColor(Palette.label2)
-                        }.accessibilityLabel(showPassword ? "Hide password" : "Show password")
-                    }
-                    if needsCode {
-                        VStack(alignment: .leading, spacing: 6) {
-                            FormRow("Authentication code", systemImage: "number") {
-                                TextField("6-digit code or recovery code", text: $code)
-                                    .keyboardType(.asciiCapable).textContentType(.oneTimeCode)
-                                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                                    .focused($focus, equals: .code).submitLabel(.go)
-                                    .onSubmit { signIn() }
-                            }
-                            Text("Open your authenticator app, or use a recovery code.")
-                                .font(.caption).foregroundColor(Palette.label2)
-                        }
-                    }
-                    if let error { InlineError(message: error) }
-                    Button { signIn() } label: {
-                        if loading { ProgressView().tint(Palette.onBrand) } else { Text(needsCode ? "Verify and sign in" : "Sign in") }
-                    }
-                    .buttonStyle(PrimaryButtonStyle()).disabled(!canSubmit).opacity(canSubmit ? 1 : 0.55)
-                }
-                .padding(20)
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-                Button("Use a different server") { Task { await session.changeServer() } }
-                    .font(.subheadline.weight(.medium)).padding(.top, 22)
+                if needsCode { twoFactorStep.transition(.move(edge: .trailing).combined(with: .opacity)) }
+                else { passwordStep.transition(.move(edge: .leading).combined(with: .opacity)) }
             }
             .frame(maxWidth: 440)
             .padding(.horizontal, 20).padding(.bottom, 30)
@@ -218,6 +167,101 @@ import RivetCore
         }
         .background(Palette.background.ignoresSafeArea())
         .scrollDismissesKeyboard(.interactively)
+        .animation(.easeInOut(duration: 0.25), value: needsCode)
+    }
+
+    // MARK: Step 1 - email and password
+
+    private var passwordStep: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 12) {
+                BrandMark(size: 84)
+                Text(session.branding.name).font(.title2.weight(.bold)).multilineTextAlignment(.center)
+                Text("Sign in to continue").font(.subheadline).foregroundColor(Palette.label2)
+                Label(session.serverDisplay, systemImage: "lock.shield").font(.caption.monospaced())
+                    .foregroundColor(Palette.label2).lineLimit(1).truncationMode(.middle)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Palette.fill, in: Capsule())
+                    .accessibilityLabel("Server \(session.serverDisplay)")
+            }.padding(.top, 48).padding(.bottom, 28)
+
+            if let notice = session.notice { InlineError(message: notice).padding(.bottom, 12) }
+
+            VStack(spacing: 16) {
+                FormRow("Username or email", systemImage: "person") {
+                    TextField("name@company.com", text: $username)
+                        .textContentType(.username).keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .focused($focus, equals: .username).submitLabel(.next)
+                        .onSubmit { focus = .password }
+                }
+                FormRow("Password", systemImage: "lock") {
+                    Group {
+                        if showPassword { TextField("Password", text: $password) } else { SecureField("Password", text: $password) }
+                    }
+                    .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .focused($focus, equals: .password).submitLabel(.go)
+                    .onSubmit { signIn() }
+                    Button { showPassword.toggle() } label: {
+                        Image(systemName: showPassword ? "eye.slash" : "eye").foregroundColor(Palette.label2)
+                    }.accessibilityLabel(showPassword ? "Hide password" : "Show password")
+                }
+                if let error { InlineError(message: error) }
+                Button { signIn() } label: {
+                    if loading { ProgressView().tint(Palette.onBrand) } else { Text("Sign in") }
+                }
+                .buttonStyle(PrimaryButtonStyle()).disabled(!canSubmit).opacity(canSubmit ? 1 : 0.55)
+            }
+            .padding(20)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+
+            Button("Use a different server") { Task { await session.changeServer() } }
+                .font(.subheadline.weight(.medium)).padding(.top, 22)
+        }
+    }
+
+    // MARK: Step 2 - two-step verification
+
+    private var twoFactorStep: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 12) {
+                Image(systemName: "lock.shield.fill").font(.system(size: 38)).foregroundColor(Palette.onBrand)
+                    .frame(width: 84, height: 84)
+                    .background(Palette.brandGradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .accessibilityHidden(true)
+                Text("Two-step verification").font(.title2.weight(.bold)).multilineTextAlignment(.center)
+                Text("Your password was accepted. Enter the code from your authenticator app to finish signing in as \(username).")
+                    .font(.subheadline).foregroundColor(Palette.label2).multilineTextAlignment(.center)
+            }.padding(.top, 56).padding(.bottom, 28)
+
+            VStack(spacing: 14) {
+                TextField("000000", text: $code)
+                    .font(.system(size: 30, weight: .semibold, design: .monospaced)).multilineTextAlignment(.center)
+                    .keyboardType(.asciiCapable).textContentType(.oneTimeCode)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .focused($focus, equals: .code).submitLabel(.go).onSubmit { signIn() }
+                    .padding(.vertical, 14)
+                    .background(Palette.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .accessibilityLabel("Authentication code")
+                    .onAppear { focus = .code }
+                    .onChange(of: code) { value in
+                        // A full six-digit code submits itself; recovery codes (letters and a dash) use the button.
+                        if value.count == 6, value.allSatisfy(\.isNumber) { signIn() }
+                    }
+                Text("Lost your phone? Enter one of your recovery codes instead.")
+                    .font(.footnote).foregroundColor(Palette.label2).multilineTextAlignment(.center)
+                if let error { InlineError(message: error) }
+                Button { signIn() } label: {
+                    if loading { ProgressView().tint(Palette.onBrand) } else { Text("Verify and sign in") }
+                }
+                .buttonStyle(PrimaryButtonStyle()).disabled(!canSubmit).opacity(canSubmit ? 1 : 0.55)
+            }
+            .padding(20)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+
+            Button { needsCode = false; code = ""; error = nil } label: { Label("Back to sign in", systemImage: "chevron.left") }
+                .font(.subheadline.weight(.medium)).disabled(loading).padding(.top, 22)
+        }
     }
 
     private func signIn() {
@@ -229,11 +273,12 @@ import RivetCore
                 switch try await session.signIn(username: username.trimmingCharacters(in: .whitespaces), password: password,
                                                 totp: needsCode ? code.trimmingCharacters(in: .whitespaces) : nil) {
                 case .signedIn: break
-                case .needsTwoFactor:
-                    needsCode = true; focus = .code
-                    error = "Your password was accepted. Enter the code from your authenticator app to finish signing in."
+                case .needsTwoFactor: needsCode = true; error = nil
                 }
-            } catch { self.error = userMessage(for: error) }
+            } catch {
+                self.error = userMessage(for: error)
+                if needsCode { code = "" }        // a wrong code is cleared so the next try starts clean
+            }
         }
     }
 }

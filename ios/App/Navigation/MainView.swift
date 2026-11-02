@@ -41,8 +41,21 @@ import RivetCore
         }
         .animation(.easeOut(duration: 0.25), value: router.menuOpen)
         .environmentObject(router)
-        .onAppear { followPendingLink() }
+        .onAppear { followPendingLink(); followShortcut() }
         .onChange(of: session.pendingDeepLink) { _ in followPendingLink() }
+        .onChange(of: session.pendingShortcut) { _ in followShortcut() }
+    }
+
+    private func followShortcut() {
+        guard let type = session.pendingShortcut else { return }
+        session.pendingShortcut = nil
+        guard let action = QuickAction(type: type) else { return }      // anything not in the allow-list is ignored
+        router.popToRoot()
+        switch action {
+        case .myTickets: router.openTickets(filter: TicketFilter(mine: true))
+        case .newTicket: router.open(.tickets); router.push(.createTicket)
+        default: router.open(action.route)
+        }
     }
 
     private func followPendingLink() {
@@ -78,6 +91,7 @@ import RivetCore
         case .contracts: ContractsView()
         case .contract(let id): ContractDetailView(id: id)
         case .credentials: AccessGuard(module: Capabilities.credential) { CredentialsView() }
+        case .credential(let id): AccessGuard(module: Capabilities.credential) { CredentialDetailView(id: id) }
         case .notifications: NotificationsView()
         case .appointments: AppointmentsView()
         case .search: SearchView()

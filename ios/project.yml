@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.9.5"
+    MARKETING_VERSION: "0.9.6"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 packages:
@@ -28,6 +28,19 @@ targets:
       properties:
         CFBundleDisplayName: RivetIT
         UILaunchScreen: {}
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.newTicket
+            UIApplicationShortcutItemTitle: New ticket
+            UIApplicationShortcutItemIconSymbolName: plus.circle
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.scan
+            UIApplicationShortcutItemTitle: Scan barcode
+            UIApplicationShortcutItemIconSymbolName: qrcode.viewfinder
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.myTickets
+            UIApplicationShortcutItemTitle: My tickets
+            UIApplicationShortcutItemIconSymbolName: person.crop.circle
+          - UIApplicationShortcutItemType: com.foleyit.itflow.ios.search
+            UIApplicationShortcutItemTitle: Search
+            UIApplicationShortcutItemIconSymbolName: magnifyingglass
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

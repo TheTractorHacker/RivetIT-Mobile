@@ -353,10 +353,11 @@ import RivetCore
 
 // MARK: Credentials
 
-/// Credentials sit behind Face ID / Touch ID / passcode. Names and URLs are listed; revealing a secret is not in this
-/// build (the Android app uses a signed biometric challenge for that).
+/// Credentials sit behind Face ID / Touch ID / passcode. Names and URLs are listed; opening one proves a fresh
+/// biometric unlock to the server (see `CredentialDetailView`) before any secret is sent.
 @MainActor struct CredentialsView: View {
     @EnvironmentObject var session: Session
+    @EnvironmentObject var router: Router
     @StateObject private var loader = PagedLoader<CredentialSummary>()
     @State private var unlocked = false
     @State private var gateMessage: String?
@@ -392,15 +393,21 @@ import RivetCore
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(state.items) { c in
-                            ListRowCard {
-                                IconTile(systemName: "key")
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(c.name).font(.subheadline.weight(.semibold))
-                                    Text([c.client, c.uri].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " • "))
-                                        .font(.caption).foregroundColor(Palette.label2).lineLimit(1)
+                            Button { router.push(.credential(c.id)) } label: {
+                                ListRowCard {
+                                    IconTile(systemName: "key")
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(c.name).font(.subheadline.weight(.semibold))
+                                        Text([c.client, c.uri].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " • "))
+                                            .font(.caption).foregroundColor(Palette.label2).lineLimit(1)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundColor(Palette.label3)
                                 }
-                                Spacer()
-                            }.task { await loader.loadMoreIfNeeded(current: c, fetchPage) }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Opens this credential after you verify your identity")
+                            .task { await loader.loadMoreIfNeeded(current: c, fetchPage) }
                         }
                     }
                 }.refreshable { await reload() }

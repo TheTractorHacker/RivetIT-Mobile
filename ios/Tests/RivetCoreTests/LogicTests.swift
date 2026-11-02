@@ -242,3 +242,51 @@ final class LoginResponseTests: XCTestCase {
         XCTAssertNil(r.requires2fa)
     }
 }
+
+final class QuickActionAndCredentialTests: XCTestCase {
+    func testQuickActionTypesMapToScreens() {
+        XCTAssertEqual(QuickAction(type: "com.foleyit.itflow.ios.newTicket")?.route, .createTicket)
+        XCTAssertEqual(QuickAction(type: "com.foleyit.itflow.ios.scan")?.route, .scan)
+        XCTAssertEqual(QuickAction(type: "com.foleyit.itflow.ios.myTickets")?.route, .tickets)
+        XCTAssertEqual(QuickAction(type: "com.foleyit.itflow.ios.search")?.route, .search)
+    }
+    func testUnknownQuickActionIsIgnored() {
+        XCTAssertNil(QuickAction(type: "com.evil.app.wipe"))
+        XCTAssertNil(QuickAction(type: ""))
+    }
+    func testCredentialDeepLinks() {
+        XCTAssertEqual(DeepLinks.resolve("credentials"), .credentials)
+        XCTAssertEqual(DeepLinks.resolve("credentials/42"), .credential(42))
+    }
+
+    func testBase64URLDecodesWithoutPadding() {
+        XCTAssertEqual(BiometricEncoding.base64URLDecode("aGVsbG8"), Data("hello".utf8))
+        XCTAssertEqual(BiometricEncoding.base64URLDecode("_-8"), Data([0xFF, 0xEF]))
+        XCTAssertNil(BiometricEncoding.base64URLDecode("%%%"))
+    }
+    func testPublicKeyPEMWrapsAnX963PointAsSPKI() throws {
+        var point = Data([0x04]); point.append(Data(repeating: 0xAB, count: 64))
+        let pem = try XCTUnwrap(BiometricEncoding.publicKeyPEM(x963: point))
+        XCTAssertTrue(pem.hasPrefix("-----BEGIN PUBLIC KEY-----\n"))
+        XCTAssertTrue(pem.hasSuffix("\n-----END PUBLIC KEY-----\n"))
+        let b64 = pem.split(separator: "\n").dropFirst().dropLast().joined()
+        let der = try XCTUnwrap(Data(base64Encoded: b64))
+        XCTAssertEqual(der.count, 91)                         // 26-byte header + 65-byte point
+        XCTAssertEqual(Array(der.prefix(4)), [0x30, 0x59, 0x30, 0x13])
+        XCTAssertEqual(der.suffix(65), point)
+        XCTAssertTrue(pem.split(separator: "\n").allSatisfy { $0.count <= 64 || $0.hasPrefix("-----") })
+    }
+    func testPublicKeyPEMRejectsOtherShapes() {
+        XCTAssertNil(BiometricEncoding.publicKeyPEM(x963: Data(repeating: 4, count: 33)))
+        XCTAssertNil(BiometricEncoding.publicKeyPEM(x963: Data(repeating: 1, count: 65)))
+    }
+    func testCredentialDetailDecodes() throws {
+        let json = #"{"id":3,"name":"Router","username":"admin","password":"s3cret","uri":"https://10.0.0.1","uri2":null,"note":"n","client":"HR"}"#
+        let c = try APIClient.decoder.decode(CredentialDetail.self, from: Data(json.utf8))
+        XCTAssertEqual(c.password, "s3cret"); XCTAssertEqual(c.client, "HR"); XCTAssertNil(c.uri2)
+    }
+    func testBiometricChallengeDecodes() throws {
+        let c = try APIClient.decoder.decode(BiometricChallenge.self, from: Data(#"{"challenge":"abc","challengeToken":"tok","timeout":60000}"#.utf8))
+        XCTAssertEqual(c.challenge, "abc"); XCTAssertEqual(c.challengeToken, "tok")
+    }
+}
