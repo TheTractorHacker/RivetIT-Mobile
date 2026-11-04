@@ -28,6 +28,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.*
+import com.foleyit.itflow.data.local.WorkClock
+import com.foleyit.itflow.data.local.formatClock
+import com.foleyit.itflow.data.local.timeWorkedField
 import com.foleyit.itflow.data.Capabilities
 import com.foleyit.itflow.data.LocalCapabilities
 import com.foleyit.itflow.data.attachments.AttachmentRules
@@ -66,10 +69,18 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     // Read-only roles still get the ticket; the controls that would be refused are hidden.
     val canWrite = com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)
 
-    // Timer (saveable so a rotation does not silently discard time that was being tracked)
-    var timerRunning by rememberSaveable { mutableStateOf(false) }
-    var elapsed by rememberSaveable { mutableLongStateOf(0L) }
-    var timerStart by rememberSaveable { mutableLongStateOf(0L) }
+    // Timer: the clock is app-wide (see WorkClock) so it keeps running when leaving this screen.
+    val clockContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) { WorkClock.attach(clockContext) }
+    val clock by WorkClock.state.collectAsState()
+    val session = clock.sessionFor(id)
+    val timerRunning = session?.running == true
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timerRunning) {
+        while (timerRunning) { now = System.currentTimeMillis(); delay(1000) }
+        now = System.currentTimeMillis()
+    }
+    val elapsedMs = session?.elapsedMs(now) ?: 0L
 
     // Sheets
     var showReply by rememberSaveable { mutableStateOf(false) }
@@ -87,23 +98,8 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
     var refresh by remember { mutableIntStateOf(0) }
     var chargesEnabled by remember { mutableStateOf(false) }
 
-    LaunchedEffect(timerRunning) {
-        if (timerRunning) {
-            timerStart = System.currentTimeMillis() - elapsed * 1000
-            while (timerRunning) {
-                elapsed = (System.currentTimeMillis() - timerStart) / 1000
-                delay(1000)
-            }
-        }
-    }
-
-    val timerDisplay = remember(elapsed) {
-        val h = elapsed / 3600; val m = (elapsed % 3600) / 60; val s = elapsed % 60
-        "$h:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}"
-    }
-    val timeWorkedString = remember(elapsed) {
-        "${(elapsed/3600).toString().padStart(2,'0')}:${((elapsed%3600)/60).toString().padStart(2,'0')}:00"
-    }
+    val timerDisplay = formatClock(elapsedMs)
+    val timeWorkedString = timeWorkedField(elapsedMs)
 
     fun load() {
         scope.launch {
@@ -118,6 +114,14 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
         }
     }
     LaunchedEffect(refresh) { load() }
+    // "Stop and log time" on the clock bar lands here with the reply sheet ready, time prefilled.
+    LaunchedEffect(clock.logRequestFor) {
+        if (WorkClock.consumeLogRequest(id)) showReply = true
+    }
+    // "Stop and log time" on the clock bar lands here with the reply sheet ready, time prefilled.
+    LaunchedEffect(clock.logRequestFor) {
+        if (WorkClock.consumeLogRequest(id)) showReply = true
+    }
 
     // Reload whenever this screen comes back to the foreground — e.g. returning from signing a
     // worksheet/outtake or the fill-worksheet screen, none of which otherwise trigger a refresh.
@@ -163,7 +167,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
 
     if (showReply) {
         ReplySheet(
-            defaultTimeWorked = if (elapsed > 0) timeWorkedString else "",
+            defaultTimeWorked = timeWorkedString,
             statuses = statuses,
             submitting = replySubmitting,
             uploadProgress = uploadProgress,
@@ -205,7 +209,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                             ApiClient.invalidateTicketResponses()
                             showReply = false
                             load()
-                            if (elapsed > 0) elapsed = 0L
+                            WorkClock.stop(id)
                         } catch (e: Exception) {
                             replyError = if (files.isEmpty())
                                 "Could not confirm the save. Check ticket history before trying again: ${userMessage(e)}"
@@ -314,7 +318,11 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                     IconButton(onClick = { navController.navigate(Screen.TicketChat.go(id)) }) {
                         Icon(Icons.Outlined.Forum, "Live Chat")
                     }
-                    if (canWrite) IconButton(onClick = { timerRunning = !timerRunning }) {
+                    if (canWrite) IconButton(onClick = {
+                        val t = state?.getOrNull()
+                        if (timerRunning) WorkClock.pause(id)
+                        else if (t != null) WorkClock.start(id, t.number, t.subject, t.client)
+                    }) {
                         Icon(
                             if (timerRunning) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
                             "Timer",
@@ -371,7 +379,7 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Timer bar
-                    if (elapsed > 0 || timerRunning) {
+                    if (session != null) {
                         item {
                             Surface(color = MaterialTheme.colorScheme.primaryContainer,
                                 shape = MaterialTheme.shapes.medium) {
@@ -385,9 +393,8 @@ fun TicketDetailScreen(id: Int, navController: NavController) {
                                         fontSize = MaterialTheme.typography.titleLarge.fontSize,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                                     Spacer(Modifier.weight(1f))
-                                    TextButton(onClick = { showReply = true }) {
-                                        Text("Log Time")
-                                    }
+                                    TextButton(onClick = { WorkClock.stop(id) }) { Text("Discard") }
+                                    TextButton(onClick = { showReply = true }) { Text("Log Time") }
                                 }
                             }
                         }

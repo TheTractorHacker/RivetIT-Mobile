@@ -26,11 +26,13 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.local.AppPreferences
+import com.foleyit.itflow.data.local.WorkClock
 import com.foleyit.itflow.ui.components.AppDrawerContent
 import com.foleyit.itflow.ui.components.BrandMark
 import com.foleyit.itflow.ui.components.FloatingBottomNavBar
 import com.foleyit.itflow.ui.components.OfflineBanner
 import com.foleyit.itflow.ui.components.UnreadDot
+import com.foleyit.itflow.ui.components.WorkClockBar
 import com.foleyit.itflow.ui.navigation.*
 import com.foleyit.itflow.ui.theme.Motion
 import com.foleyit.itflow.ui.theme.ThemeMode
@@ -84,6 +86,8 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) { WorkClock.attach(appContext) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     var userName by remember { mutableStateOf("") }
     var userEmail by remember { mutableStateOf("") }
@@ -171,6 +175,7 @@ fun MainScreen(
                 try { ApiClient.service().logout() } catch (_: Exception) {}
             }
             prefs.clearAuth()
+            WorkClock.clear()
             ApiClient.clearToken()
             onLoggedOut()
         }
@@ -246,23 +251,32 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (currentRoute in BOTTOM_NAV_ROUTES) {
-                val hierarchy = currentDest?.destination?.hierarchy
-                FloatingBottomNavBar(
-                    items = bottomNavItems.filter {
-                        when (it.screen.route) {
-                            Screen.Tickets.route, Screen.Appointments.route ->
-                                capabilities.canView(com.foleyit.itflow.data.Capabilities.SUPPORT)
-                            Screen.Clients.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.CLIENT)
-                            Screen.Assets.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.ASSETS)
-                            else -> true
-                        }
+            Column {
+                WorkClockBar(
+                    hideOnTicketId = if (currentRoute == Screen.TicketDetail.route)
+                        currentDest?.arguments?.getString("id")?.toIntOrNull() else null,
+                    onOpenTicket = { id ->
+                        navController.navigate(Screen.TicketDetail.go(id)) { launchSingleTop = true }
                     },
-                    isSelected = { item ->
-                        hierarchy?.any { it.route == item.screen.route } == true || currentRoute == item.screen.route
-                    },
-                    onSelect = ::navigateToTab,
                 )
+                if (currentRoute in BOTTOM_NAV_ROUTES) {
+                    val hierarchy = currentDest?.destination?.hierarchy
+                    FloatingBottomNavBar(
+                        items = bottomNavItems.filter {
+                            when (it.screen.route) {
+                                Screen.Tickets.route, Screen.Appointments.route ->
+                                    capabilities.canView(com.foleyit.itflow.data.Capabilities.SUPPORT)
+                                Screen.Clients.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.CLIENT)
+                                Screen.Assets.route -> capabilities.canView(com.foleyit.itflow.data.Capabilities.ASSETS)
+                                else -> true
+                            }
+                        },
+                        isSelected = { item ->
+                            hierarchy?.any { it.route == item.screen.route } == true || currentRoute == item.screen.route
+                        },
+                        onSelect = ::navigateToTab,
+                    )
+                }
             }
         }
     ) { padding ->

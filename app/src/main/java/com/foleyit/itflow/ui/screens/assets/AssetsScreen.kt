@@ -142,7 +142,8 @@ fun AssetsScreen(navController: NavController) {
                 displayedItems.isEmpty() && !ls.hasMore -> EmptyScreen("No assets found", Icons.Outlined.Devices)
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        // bottom inset keeps the last row clear of the scan / + buttons
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (ls.isRefreshing || ls.error != null) {

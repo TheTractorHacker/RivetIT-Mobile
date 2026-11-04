@@ -27,6 +27,8 @@ import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.Appointment
 import com.foleyit.itflow.data.api.DashboardResponse
 import com.foleyit.itflow.data.api.TicketSummary
+import com.foleyit.itflow.data.local.WorkClock
+import com.foleyit.itflow.data.local.WorkSession
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadingScreen
 import com.foleyit.itflow.ui.components.pressScale
@@ -44,6 +46,10 @@ fun DashboardScreen(navController: NavController) {
     var activeAlerts by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    LaunchedEffect(Unit) { WorkClock.attach(context) }
+    val clock by WorkClock.state.collectAsState()
+    // Read-only roles cannot add time to a ticket, so they get no start button.
+    val canClock = com.foleyit.itflow.data.LocalCapabilities.current.canWrite(com.foleyit.itflow.data.Capabilities.SUPPORT)
 
     fun load() {
         scope.launch {
@@ -128,31 +134,21 @@ fun DashboardScreen(navController: NavController) {
                     QuickActionsRow(navController)
                 }
 
-                // Today: appointments + active alerts — the "while on the go" summary
+                // One-line pulse: only the counts that are not zero, so nothing takes space to say "0".
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatCard(
-                            label = "Today's Appts",
-                            value = appointmentsToday.size.toString(),
-                            icon = Icons.Outlined.CalendarMonth,
-                            bg = if (appointmentsToday.isNotEmpty()) MaterialTheme.colorScheme.tertiaryContainer
-                                 else MaterialTheme.colorScheme.surfaceVariant,
-                            fg = if (appointmentsToday.isNotEmpty()) MaterialTheme.colorScheme.onTertiaryContainer
-                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate(Screen.Appointments.route) }
-                        )
-                        StatCard(
-                            label = "Active Alerts",
-                            value = activeAlerts.toString(),
-                            icon = Icons.Outlined.NotificationImportant,
-                            bg = if (activeAlerts > 0) MaterialTheme.colorScheme.errorContainer
-                                 else MaterialTheme.colorScheme.surfaceVariant,
-                            fg = if (activeAlerts > 0) MaterialTheme.colorScheme.onErrorContainer
-                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate(Screen.Alerts.route) }
-                        )
+                    val pulse = buildList {
+                        if (dash.overdue > 0) add(PulseChip(dash.overdue, "overdue", true) { navController.navigate(Screen.Tickets.route) })
+                        add(PulseChip(dash.allOpen, "open", false) { navController.navigate(Screen.Tickets.route) })
+                        if ((dash.dueToday ?: 0) > 0) add(PulseChip(dash.dueToday!!, "due today", false) { navController.navigate(Screen.Tickets.route) })
+                        if ((dash.onsiteOpen ?: 0) > 0) add(PulseChip(dash.onsiteOpen!!, "on-site", false) { navController.navigate(Screen.Tickets.route) })
+                        if (activeAlerts > 0) add(PulseChip(activeAlerts, "alerts", true) { navController.navigate(Screen.Alerts.route) })
+                    }
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        pulse.forEach { PulseChipView(it) }
                     }
                 }
 
@@ -168,82 +164,6 @@ fun DashboardScreen(navController: NavController) {
                     items(appointmentsToday) { appt ->
                         AppointmentSummaryCard(appt) {
                             navController.navigate(Screen.TicketDetail.go(appt.ticketId))
-                        }
-                    }
-                }
-
-                // Hero: My Open
-                item {
-                    MyOpenHeroCard(
-                        value = dash.myOpen,
-                        onClick = { navController.navigate(Screen.Tickets.route) }
-                    )
-                }
-
-                // Secondary stats — 2x2 grid
-                item {
-                    val secondaryStats = buildList {
-                        add(
-                            SecondaryStat(
-                                label = "All Open",
-                                value = dash.allOpen.toString(),
-                                icon = Icons.Outlined.ConfirmationNumber,
-                                bg = MaterialTheme.colorScheme.secondaryContainer,
-                                fg = MaterialTheme.colorScheme.onSecondaryContainer,
-                                onClick = { navController.navigate(Screen.Tickets.route) }
-                            )
-                        )
-                        add(
-                            SecondaryStat(
-                                label = "Overdue",
-                                value = dash.overdue.toString(),
-                                icon = Icons.Outlined.Warning,
-                                bg = MaterialTheme.colorScheme.errorContainer,
-                                fg = MaterialTheme.colorScheme.onErrorContainer,
-                                onClick = null
-                            )
-                        )
-                        dash.dueToday?.let { dueToday ->
-                            add(
-                                SecondaryStat(
-                                    label = "Due Today",
-                                    value = dueToday.toString(),
-                                    icon = Icons.Outlined.Schedule,
-                                    bg = MaterialTheme.colorScheme.tertiaryContainer,
-                                    fg = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    onClick = { navController.navigate(Screen.Tickets.route) }
-                                )
-                            )
-                        }
-                        dash.onsiteOpen?.let { onsiteOpen ->
-                            add(
-                                SecondaryStat(
-                                    label = "On-Site",
-                                    value = onsiteOpen.toString(),
-                                    icon = Icons.Outlined.LocationOn,
-                                    bg = MaterialTheme.colorScheme.surfaceVariant,
-                                    fg = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    onClick = { navController.navigate(Screen.Tickets.route) }
-                                )
-                            )
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        secondaryStats.chunked(2).forEach { rowStats ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                rowStats.forEach { stat ->
-                                    StatCard(
-                                        label = stat.label,
-                                        value = stat.value,
-                                        icon = stat.icon,
-                                        bg = stat.bg,
-                                        fg = stat.fg,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = stat.onClick
-                                    )
-                                }
-                                if (rowStats.size == 1) Spacer(Modifier.weight(1f))
-                            }
                         }
                     }
                 }
@@ -298,8 +218,17 @@ fun DashboardScreen(navController: NavController) {
                         }
                     }
                 } else {
-                    items(dash.queue.take(4)) { ticket ->
-                        QueueTicketCard(ticket) {
+                    items(dash.queue.take(5), key = { it.id }) { ticket ->
+                        QueueTicketCard(
+                            ticket,
+                            session = clock.sessionFor(ticket.id),
+                            canClock = canClock,
+                            onToggleClock = {
+                                val running = clock.sessionFor(ticket.id)?.running == true
+                                if (running) WorkClock.pause(ticket.id)
+                                else WorkClock.start(ticket.id, ticket.number, ticket.subject, ticket.client)
+                            },
+                        ) {
                             navController.navigate(Screen.TicketDetail.go(ticket.id))
                         }
                     }
@@ -309,14 +238,25 @@ fun DashboardScreen(navController: NavController) {
     }
 }
 
-private data class SecondaryStat(
-    val label: String,
-    val value: String,
-    val icon: ImageVector,
-    val bg: Color,
-    val fg: Color,
-    val onClick: (() -> Unit)?
-)
+private data class PulseChip(val value: Int, val label: String, val urgent: Boolean, val onClick: () -> Unit)
+
+@Composable
+private fun PulseChipView(chip: PulseChip) {
+    Surface(
+        onClick = chip.onClick,
+        shape = MaterialTheme.shapes.large,
+        color = if (chip.urgent) MaterialTheme.colorScheme.errorContainer
+                else MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = if (chip.urgent) MaterialTheme.colorScheme.onErrorContainer
+                       else MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(chip.value.toString(), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(5.dp))
+            Text(chip.label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
 
 @Composable
 private fun QuickActionsRow(navController: NavController) {
@@ -388,85 +328,6 @@ private fun QuickActionsRow(navController: NavController) {
 }
 
 @Composable
-private fun MyOpenHeroCard(value: Int, onClick: () -> Unit) {
-    val gradient = Brush.linearGradient(
-        listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.tertiaryContainer),
-        start = Offset.Zero,
-        end = Offset.Infinite
-    )
-    val onColor = MaterialTheme.colorScheme.onPrimaryContainer
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(gradient)
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(52.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Outlined.Person, null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    value.toString(),
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.W800,
-                    color = onColor
-                )
-                Text(
-                    "tickets in My Open",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onColor.copy(alpha = 0.8f)
-                )
-            }
-            Icon(Icons.Outlined.ChevronRight, null, tint = onColor)
-        }
-    }
-}
-
-@Composable
-private fun StatCard(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    bg: Color,
-    fg: Color,
-    modifier: Modifier,
-    onClick: (() -> Unit)? = null
-) {
-    val base = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
-    Surface(color = bg, shape = MaterialTheme.shapes.large, modifier = base) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Icon(icon, null, tint = fg.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
-            Spacer(Modifier.height(10.dp))
-            Text(
-                value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = fg
-            )
-            Text(label, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.75f))
-        }
-    }
-}
-
-@Composable
 private fun AppointmentSummaryCard(appt: Appointment, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -494,7 +355,13 @@ private fun AppointmentSummaryCard(appt: Appointment, onClick: () -> Unit) {
 }
 
 @Composable
-private fun QueueTicketCard(ticket: TicketSummary, onClick: () -> Unit) {
+private fun QueueTicketCard(
+    ticket: TicketSummary,
+    session: WorkSession?,
+    canClock: Boolean,
+    onToggleClock: () -> Unit,
+    onClick: () -> Unit,
+) {
     val priorityColor = MaterialTheme.statusColors.forPriority(ticket.priority)
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -539,17 +406,32 @@ private fun QueueTicketCard(ticket: TicketSummary, onClick: () -> Unit) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            ticket.status?.let { status ->
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        status,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+            Column(horizontalAlignment = Alignment.End) {
+                ticket.status?.let { status ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            status,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+                if (canClock) {
+                    val running = session?.running == true
+                    FilledTonalIconButton(
+                        onClick = onToggleClock,
+                        modifier = Modifier.padding(top = 6.dp).size(40.dp),
+                    ) {
+                        Icon(
+                            if (running) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
+                            contentDescription = if (running) "Pause timer on #${ticket.number}"
+                                                 else "Start timer on #${ticket.number}",
+                        )
+                    }
                 }
             }
         }

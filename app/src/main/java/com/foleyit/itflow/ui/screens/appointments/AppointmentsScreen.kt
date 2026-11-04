@@ -126,7 +126,8 @@ fun AppointmentsScreen(navController: NavController) {
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        // bottom inset keeps the last card clear of the floating + button
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(appts) { appt ->
