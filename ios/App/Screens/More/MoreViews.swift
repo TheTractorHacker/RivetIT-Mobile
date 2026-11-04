@@ -183,7 +183,8 @@ import RivetCore
         Task {
             if on {
                 let granted = await NotificationAlerts.requestAuthorization()
-                alertsBlocked = !granted && (await NotificationAlerts.isDenied())
+                let denied = await NotificationAlerts.isDenied()
+                alertsBlocked = !granted && denied
                 alertsOn = granted
                 NotificationAlerts.enabled = granted
             } else {
