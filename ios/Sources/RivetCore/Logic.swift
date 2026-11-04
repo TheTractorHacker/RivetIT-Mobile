@@ -282,3 +282,40 @@ public struct PagedState<T> {
     public init() {}
     public var hasMore: Bool { items.count < total }
 }
+
+// MARK: - Notification alerts (free local notifications; no APNs)
+
+/// Decides which server notifications deserve a local alert. The app polls `GET /notifications` in the background and
+/// remembers the highest id it has already seen, so each notification alerts once.
+public enum NotificationAlertPlan {
+    public struct Result: Equatable {
+        /// Oldest first, at most `maxAlerts`.
+        public let toAlert: [AppNotification]
+        /// New notifications beyond `maxAlerts`, summarised as one "and N more" alert.
+        public let overflow: Int
+        /// Store this as the new high-water mark.
+        public let lastSeenID: Int
+    }
+
+    /// The first run (`lastSeenID == nil`) only records a baseline: opening the app must not replay old notifications.
+    public static func plan(items: [AppNotification], lastSeenID: Int?, maxAlerts: Int = 4) -> Result {
+        let newest = items.map(\.id).max()
+        guard let lastSeenID else { return Result(toAlert: [], overflow: 0, lastSeenID: newest ?? 0) }
+        let fresh = items.filter { $0.id > lastSeenID }.sorted { $0.id < $1.id }
+        let shown = Array(fresh.suffix(maxAlerts))
+        return Result(toAlert: shown, overflow: fresh.count - shown.count, lastSeenID: max(lastSeenID, newest ?? 0))
+    }
+
+    /// One tidy line for the banner: whitespace collapsed, capped, never empty.
+    public static func body(_ message: String, limit: Int = 160) -> String {
+        let flat = message.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if flat.isEmpty { return "You have a new notification" }
+        return flat.count > limit ? String(flat.prefix(limit - 1)) + "…" : flat
+    }
+
+    /// Where tapping the alert goes: the notification's own link when it is a real screen, else the notifications list.
+    public static func route(for n: AppNotification) -> String {
+        if let action = n.action, DeepLinks.resolve(action) != nil { return action }
+        return "notifications"
+    }
+}

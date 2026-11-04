@@ -43,8 +43,14 @@ struct RivetITApp: App {
             session.pendingDeepLink = parts.joined(separator: "/")
         }
         .onReceive(NotificationCenter.default.publisher(for: QuickActionInbox.received)) { _ in takeShortcut() }
+        .onReceive(NotificationCenter.default.publisher(for: NotificationAlerts.tapped)) { _ in takeAlertTap() }
+        .onChange(of: session.phase) { phase in
+            if phase == .main { Task { await NotificationAlerts.activate(api: session.api) } }
+        }
         .onAppear {
             takeShortcut()
+            takeAlertTap()
+            if session.phase == .main { Task { await NotificationAlerts.activate(api: session.api) } }
             if !launchChecked {
                 launchChecked = true
                 if session.biometricLock && session.phase == .main { locked = true }
@@ -52,15 +58,23 @@ struct RivetITApp: App {
         }
         .onChange(of: scenePhase) { phase in
             switch phase {
-            case .background: backgroundedAt = Date()
+            case .background:
+                backgroundedAt = Date()
+                if session.phase == .main { NotificationAlerts.scheduleRefresh() }
             case .active:
                 takeShortcut()
+                takeAlertTap()
+                if session.phase == .main { Task { await NotificationAlerts.activate(api: session.api) } }
                 Task { await session.loadBranding() }
                 if session.biometricLock, session.phase == .main, let t = backgroundedAt, Date().timeIntervalSince(t) > 300 { locked = true }
                 backgroundedAt = nil
             default: break
             }
         }
+    }
+
+    private func takeAlertTap() {
+        if let route = NotificationAlerts.takeTappedRoute() { session.pendingDeepLink = route }
     }
 
     private func takeShortcut() {

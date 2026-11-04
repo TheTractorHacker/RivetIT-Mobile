@@ -108,6 +108,8 @@ import RivetCore
     @State private var message: String?
     @State private var failed = false
     @State private var showPassword = false
+    @State private var alertsOn = true
+    @State private var alertsBlocked = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -141,9 +143,12 @@ import RivetCore
                     settingRow("server.rack", "Server", session.serverDisplay) {
                         Button("Change") { Task { await session.changeServer() } }.font(.subheadline)
                     }
-                    settingRow("bell.badge", "Notifications", "Manage push notification settings") {
-                        Button { if let u = URL(string: UIApplication.openSettingsURLString) { openURL(u) } } label: {
-                            Image(systemName: "arrow.up.forward.square").foregroundColor(Palette.label3)
+                    settingRow("bell.badge", "Notification Alerts",
+                               alertsBlocked ? "Blocked in iOS Settings" : "Alert me about new notifications, checked in the background") {
+                        if alertsBlocked {
+                            Button("Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { openURL(u) } }.font(.subheadline)
+                        } else {
+                            Toggle("", isOn: Binding(get: { alertsOn }, set: { setAlerts($0) })).labelsHidden().tint(Palette.brand)
                         }
                     }
                 }.background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous)).padding(.horizontal, 16)
@@ -164,7 +169,28 @@ import RivetCore
         .background(Palette.background.ignoresSafeArea())
         .navigationTitle("Profile").navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPassword) { ChangePasswordSheet(name: name, email: email).presentationDetents([.medium]) }
-        .onAppear { if let p = session.profile { name = p.name; email = p.email } }
+        .onAppear {
+            if let p = session.profile { name = p.name; email = p.email }
+            Task {
+                alertsBlocked = await NotificationAlerts.isDenied()
+                alertsOn = NotificationAlerts.enabled && !alertsBlocked
+            }
+        }
+    }
+
+    private func setAlerts(_ on: Bool) {
+        alertsOn = on
+        Task {
+            if on {
+                let granted = await NotificationAlerts.requestAuthorization()
+                let denied = await NotificationAlerts.isDenied()
+                alertsBlocked = !granted && denied
+                alertsOn = granted
+                NotificationAlerts.enabled = granted
+            } else {
+                NotificationAlerts.enabled = false
+            }
+        }
     }
 
     private var appVersion: String {

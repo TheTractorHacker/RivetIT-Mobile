@@ -141,6 +141,7 @@ final class Session: ObservableObject {
     func signOut(tellServer: Bool = true) async {
         if tellServer, let api, api.token != nil { try? await api.logout() }
         Keychain.set(nil, for: Keys.token)
+        NotificationAlerts.reset()
         api?.token = nil
         profile = nil
         capabilities = .unrestricted
@@ -200,6 +201,21 @@ final class Session: ObservableObject {
             capabilities = Capabilities(profile: p)
         }
         if let d = try? await api.dashboard() { hasUnread = d.unread > 0 }
+    }
+
+    /// A client for the background alert check, built from what is saved on disk (the app may have been launched
+    /// just for that, with no `Session` yet). Nil when nobody is signed in.
+    nonisolated static func backgroundClient() -> APIClient? {
+        let d = UserDefaults.standard
+        guard let s = d.string(forKey: Keys.server), let url = URL(string: s), let token = Keychain.get(Keys.token) else { return nil }
+        return APIClient(serverURL: url, token: token, transport: PinnedTransport(pinnedFingerprint: d.string(forKey: Keys.fingerprint)))
+    }
+
+    /// The company name last published by the server, for the title of an alert; "RivetIT" before the first load.
+    nonisolated static func cachedBrandName() -> String {
+        let d = UserDefaults.standard
+        let name = d.string(forKey: Keys.server).flatMap { d.string(forKey: "branding." + $0) }
+        return (name?.isEmpty == false ? name : nil) ?? "RivetIT"
     }
 
     private func buildClient(token: String?) {
