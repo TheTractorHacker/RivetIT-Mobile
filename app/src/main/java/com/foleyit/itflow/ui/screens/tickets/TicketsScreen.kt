@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.foleyit.itflow.ui.components.FabClearance
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.SavedTicketView
@@ -252,7 +253,7 @@ fun TicketsScreen(navController: NavController) {
                 val tickets = ls.items
                 val statusOrder = tickets.map { it.status ?: "Unknown" }.distinct()
                 val grouped = tickets.groupBy { it.status ?: "Unknown" }
-                LazyColumn(state = openListState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                LazyColumn(state = openListState, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FabClearance)) {
                     statusOrder.forEach { status ->
                         val group = grouped[status] ?: return@forEach
                         val color = group.firstOrNull()?.statusColor
@@ -292,7 +293,7 @@ fun TicketsScreen(navController: NavController) {
                 // Closed tickets — simple flat list
                 LazyColumn(
                     state = closedListState,
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = FabClearance),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(ls.items, key = { it.id }) { t ->
