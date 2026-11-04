@@ -48,9 +48,21 @@ before retrying, deep links are allow-listed, and `rivetit://tickets/157` style 
 - Revealing a credential's secret (needs the signed biometric-challenge flow the Android app uses).
 - Worksheet and outtake create / fill / sign (the ticket shows their lists only).
 - Report screens other than Overview (the rows say so).
-- Push notifications (APNs) and ticket attachments.
+- Real push (APNs) — needs a paid Apple Developer account. See *Notification alerts* below for the free substitute.
 - Rich rendering of knowledge-base HTML (shown as text).
 - Expiring-asset and per-report details, and iPad-specific split layouts.
+
+## Notification alerts (free, not instant)
+
+APNs push needs a paid Apple Developer account (and a Firebase key on the server), so the app does not use it. Instead
+`App/Core/NotificationAlerts.swift` uses **Background App Refresh**: iOS wakes the app now and then, it reads
+`GET /api/v1/notifications`, and raises a **local** notification for anything newer than the last one it saw. Tapping
+an alert opens that ticket/screen (validated by `DeepLinks`). The "what is new" rules are in RivetCore
+(`NotificationAlertPlan`) and unit tested.
+
+Limits, by design of iOS: the wake-ups are scheduled by iOS, typically every 15 min to a few hours and less often if the
+app is rarely opened; none happen with Background App Refresh or Low Power Mode off, or after the user force-quits the
+app. Turn it on/off in Profile → Notification Alerts. Real-time push stays a follow-up (needs the paid account).
 
 ## Layout
 

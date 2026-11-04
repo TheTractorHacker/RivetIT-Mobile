@@ -41,6 +41,8 @@ targets:
           - UIApplicationShortcutItemType: com.foleyit.itflow.ios.search
             UIApplicationShortcutItemTitle: Search
             UIApplicationShortcutItemIconSymbolName: magnifyingglass
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [com.foleyit.itflow.ios.refresh]
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:

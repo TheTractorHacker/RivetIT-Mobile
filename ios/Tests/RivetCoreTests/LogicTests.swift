@@ -290,3 +290,45 @@ final class QuickActionAndCredentialTests: XCTestCase {
         XCTAssertEqual(c.challenge, "abc"); XCTAssertEqual(c.challengeToken, "tok")
     }
 }
+
+final class NotificationAlertPlanTests: XCTestCase {
+    private func n(_ id: Int, action: String? = nil, message: String = "m") -> AppNotification {
+        let a = action.map { "\"\($0)\"" } ?? "null"
+        let json = #"{"id":\#(id),"type":"ticket","message":"\#(message)","action":\#(a),"timestamp":null}"#
+        return try! APIClient.decoder.decode(AppNotification.self, from: Data(json.utf8))
+    }
+
+    func testFirstRunOnlyRecordsABaseline() {
+        let r = NotificationAlertPlan.plan(items: [n(3), n(9), n(5)], lastSeenID: nil)
+        XCTAssertTrue(r.toAlert.isEmpty); XCTAssertEqual(r.overflow, 0); XCTAssertEqual(r.lastSeenID, 9)
+    }
+    func testFirstRunWithNothingBaselinesAtZeroSoTheNextOneAlerts() {
+        XCTAssertEqual(NotificationAlertPlan.plan(items: [], lastSeenID: nil).lastSeenID, 0)
+        XCTAssertEqual(NotificationAlertPlan.plan(items: [n(1)], lastSeenID: 0).toAlert.map(\.id), [1])
+    }
+    func testOnlyNewerThanLastSeenAlertOldestFirst() {
+        let r = NotificationAlertPlan.plan(items: [n(12), n(10), n(11), n(7)], lastSeenID: 10)
+        XCTAssertEqual(r.toAlert.map(\.id), [11, 12]); XCTAssertEqual(r.lastSeenID, 12)
+    }
+    func testNothingNewKeepsTheMarkAndNeverGoesBackwards() {
+        let r = NotificationAlertPlan.plan(items: [n(4)], lastSeenID: 10)
+        XCTAssertTrue(r.toAlert.isEmpty); XCTAssertEqual(r.lastSeenID, 10)
+        XCTAssertEqual(NotificationAlertPlan.plan(items: [], lastSeenID: 10).lastSeenID, 10)
+    }
+    func testAFloodIsCappedToTheNewestAndCountsTheRest() {
+        let r = NotificationAlertPlan.plan(items: (1...9).map { n($0) }, lastSeenID: 0, maxAlerts: 4)
+        XCTAssertEqual(r.toAlert.map(\.id), [6, 7, 8, 9]); XCTAssertEqual(r.overflow, 5); XCTAssertEqual(r.lastSeenID, 9)
+    }
+    func testBodyCollapsesWhitespaceCapsLengthAndNeverEmpty() {
+        XCTAssertEqual(NotificationAlertPlan.body("  Ticket \n #5   updated "), "Ticket #5 updated")
+        XCTAssertEqual(NotificationAlertPlan.body(String(repeating: "a", count: 300)).count, 160)
+        XCTAssertTrue(NotificationAlertPlan.body(String(repeating: "a", count: 300)).hasSuffix("…"))
+        XCTAssertEqual(NotificationAlertPlan.body("   "), "You have a new notification")
+    }
+    func testRouteFollowsOnlyRealScreensElseTheList() {
+        XCTAssertEqual(NotificationAlertPlan.route(for: n(1, action: "tickets/157")), "tickets/157")
+        XCTAssertEqual(NotificationAlertPlan.route(for: n(1, action: "worksheets/5")), "notifications")   // allowed but no screen
+        XCTAssertEqual(NotificationAlertPlan.route(for: n(1, action: "https://evil.example/x")), "notifications")
+        XCTAssertEqual(NotificationAlertPlan.route(for: n(1, action: nil)), "notifications")
+    }
+}
