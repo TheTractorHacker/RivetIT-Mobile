@@ -17,16 +17,20 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
+import com.foleyit.itflow.data.Capabilities
+import com.foleyit.itflow.data.LocalCapabilities
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.data.api.Appointment
 import com.foleyit.itflow.data.api.DashboardResponse
 import com.foleyit.itflow.data.api.TicketSummary
+import com.foleyit.itflow.data.timer.ActiveTimer
+import com.foleyit.itflow.data.timer.TimerSnapshot
+import com.foleyit.itflow.data.timer.formatClock
 import com.foleyit.itflow.ui.components.ErrorScreen
 import com.foleyit.itflow.ui.components.LoadingScreen
 import com.foleyit.itflow.ui.components.pressScale
@@ -34,22 +38,41 @@ import com.foleyit.itflow.ui.navigation.Screen
 import com.foleyit.itflow.ui.theme.forPriority
 import com.foleyit.itflow.ui.theme.statusColors
 import com.foleyit.itflow.ui.util.fmtDate
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+// Last good dashboard, so coming back to Home paints instantly instead of a full-screen spinner.
+private var cachedDashboard: DashboardResponse? = null
+
+/** How many ranked tickets Home lists; the rest are one tap away under "See all". */
+private const val QUEUE_ROWS = 8
+
 @Composable
 fun DashboardScreen(navController: NavController) {
-    var state by remember { mutableStateOf<Result<DashboardResponse>?>(null) }
+    var state by remember { mutableStateOf<Result<DashboardResponse>?>(cachedDashboard?.let { Result.success(it) }) }
     var appointmentsToday by remember { mutableStateOf<List<Appointment>>(emptyList()) }
     var activeAlerts by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    LaunchedEffect(Unit) { ActiveTimer.ensureLoaded(context) }
+    val timer by ActiveTimer.state.collectAsState()
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timer?.running) {
+        while (timer?.running == true) {
+            nowMs = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    val canWrite = LocalCapabilities.current.canWrite(Capabilities.SUPPORT)
 
     fun load() {
         scope.launch {
             val result = runCatching { ApiClient.service().getDashboard() }
-            state = result
+            // Keep showing the last good data if a refresh fails; only surface the error when there is none.
+            if (result.isSuccess || state?.isSuccess != true) state = result
             result.getOrNull()?.let { dash ->
+                cachedDashboard = dash
                 context.getSharedPreferences("widget_cache", android.content.Context.MODE_PRIVATE)
                     .edit()
                     .putInt("open", dash.allOpen)
@@ -83,77 +106,70 @@ fun DashboardScreen(navController: NavController) {
                 in 17..20 -> "Good evening"
                 else      -> "Working late?"
             }
+            val ranked = remember(dash.queue, nowMs / 60_000) { rankQueue(dash.queue, System.currentTimeMillis()) }
+            // The ticket the Now card features: the timer's ticket if one is running, else the top-ranked.
+            val featured = timer?.let { t -> ranked.firstOrNull { it.id == t.ticketId } } ?: ranked.firstOrNull()
+            val listed = ranked.filter { it.id != featured?.id && it.id != timer?.ticketId }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Greeting header
                 item {
-                    Column(modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)) {
-                        Text(
-                            greeting,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(3.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(greeting, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
                         if (dash.unread > 0) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Outlined.Notifications, null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                            Row(
+                                modifier = Modifier.clickable { navController.navigate(Screen.Notifications.route) },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.Notifications, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    "${dash.unread} unread notification${if (dash.unread != 1) "s" else ""}",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    "${dash.unread} unread",
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
-                        } else {
-                            Text(
-                                "All caught up",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
                         }
                     }
                 }
 
-                // Quick actions
                 item {
-                    QuickActionsRow(navController)
+                    NowCard(
+                        timer = timer,
+                        nowMs = nowMs,
+                        featured = featured,
+                        canWrite = canWrite,
+                        onOpen = { id -> navController.navigate(Screen.TicketDetail.go(id)) },
+                        onPauseResume = { t ->
+                            if (t.running) ActiveTimer.pause(context)
+                            else ActiveTimer.start(context, t.ticketId, t.number, t.subject, t.client)
+                        },
+                        onStart = { tk ->
+                            if (ActiveTimer.start(context, tk.id, tk.number, tk.subject, tk.client)) {
+                                navController.navigate(Screen.TicketDetail.go(tk.id))
+                            }
+                        }
+                    )
                 }
 
-                // Today: appointments + active alerts — the "while on the go" summary
+                item { QuickActionsRow(navController) }
+
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatCard(
-                            label = "Today's Appts",
-                            value = appointmentsToday.size.toString(),
-                            icon = Icons.Outlined.CalendarMonth,
-                            bg = if (appointmentsToday.isNotEmpty()) MaterialTheme.colorScheme.tertiaryContainer
-                                 else MaterialTheme.colorScheme.surfaceVariant,
-                            fg = if (appointmentsToday.isNotEmpty()) MaterialTheme.colorScheme.onTertiaryContainer
-                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate(Screen.Appointments.route) }
-                        )
-                        StatCard(
-                            label = "Active Alerts",
-                            value = activeAlerts.toString(),
-                            icon = Icons.Outlined.NotificationImportant,
-                            bg = if (activeAlerts > 0) MaterialTheme.colorScheme.errorContainer
-                                 else MaterialTheme.colorScheme.surfaceVariant,
-                            fg = if (activeAlerts > 0) MaterialTheme.colorScheme.onErrorContainer
-                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            onClick = { navController.navigate(Screen.Alerts.route) }
-                        )
-                    }
+                    StatChips(
+                        overdue = dash.overdue,
+                        alerts = activeAlerts,
+                        appointments = appointmentsToday.size,
+                        allOpen = dash.allOpen,
+                        onsite = dash.onsiteOpen ?: 0,
+                        onTickets = { navController.navigate(Screen.Tickets.route) },
+                        onAlerts = { navController.navigate(Screen.Alerts.route) },
+                        onAppointments = { navController.navigate(Screen.Appointments.route) },
+                    )
                 }
 
                 if (appointmentsToday.isNotEmpty()) {
@@ -172,134 +188,26 @@ fun DashboardScreen(navController: NavController) {
                     }
                 }
 
-                // Hero: My Open
-                item {
-                    MyOpenHeroCard(
-                        value = dash.myOpen,
-                        onClick = { navController.navigate(Screen.Tickets.route) }
-                    )
-                }
-
-                // Secondary stats — 2x2 grid
-                item {
-                    val secondaryStats = buildList {
-                        add(
-                            SecondaryStat(
-                                label = "All Open",
-                                value = dash.allOpen.toString(),
-                                icon = Icons.Outlined.ConfirmationNumber,
-                                bg = MaterialTheme.colorScheme.secondaryContainer,
-                                fg = MaterialTheme.colorScheme.onSecondaryContainer,
-                                onClick = { navController.navigate(Screen.Tickets.route) }
-                            )
-                        )
-                        add(
-                            SecondaryStat(
-                                label = "Overdue",
-                                value = dash.overdue.toString(),
-                                icon = Icons.Outlined.Warning,
-                                bg = MaterialTheme.colorScheme.errorContainer,
-                                fg = MaterialTheme.colorScheme.onErrorContainer,
-                                onClick = null
-                            )
-                        )
-                        dash.dueToday?.let { dueToday ->
-                            add(
-                                SecondaryStat(
-                                    label = "Due Today",
-                                    value = dueToday.toString(),
-                                    icon = Icons.Outlined.Schedule,
-                                    bg = MaterialTheme.colorScheme.tertiaryContainer,
-                                    fg = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    onClick = { navController.navigate(Screen.Tickets.route) }
-                                )
-                            )
-                        }
-                        dash.onsiteOpen?.let { onsiteOpen ->
-                            add(
-                                SecondaryStat(
-                                    label = "On-Site",
-                                    value = onsiteOpen.toString(),
-                                    icon = Icons.Outlined.LocationOn,
-                                    bg = MaterialTheme.colorScheme.surfaceVariant,
-                                    fg = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    onClick = { navController.navigate(Screen.Tickets.route) }
-                                )
-                            )
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        secondaryStats.chunked(2).forEach { rowStats ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                rowStats.forEach { stat ->
-                                    StatCard(
-                                        label = stat.label,
-                                        value = stat.value,
-                                        icon = stat.icon,
-                                        bg = stat.bg,
-                                        fg = stat.fg,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = stat.onClick
-                                    )
-                                }
-                                if (rowStats.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-
-                // My Queue section header
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                "My Queue",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (dash.queue.isNotEmpty()) {
+                if (listed.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Then", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "${dash.queue.size} ticket${if (dash.queue.size != 1) "s" else ""}",
+                                    "${dash.myOpen} assigned to you",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
                             }
-                        }
-                        TextButton(onClick = { navController.navigate(Screen.Tickets.route) }) {
-                            Text("See all")
+                            TextButton(onClick = { navController.navigate(Screen.Tickets.route) }) { Text("See all") }
                         }
                     }
-                }
-
-                if (dash.queue.isEmpty()) {
-                    item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(
-                                modifier = Modifier.padding(32.dp).fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    Icons.Outlined.CheckCircle, null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Text("Queue is clear!", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "No tickets assigned to you",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    items(dash.queue.take(4)) { ticket ->
-                        QueueTicketCard(ticket) {
+                    items(listed.take(QUEUE_ROWS), key = { it.id }) { ticket ->
+                        QueueTicketCard(ticket, overdue = isOverdue(ticket, nowMs)) {
                             navController.navigate(Screen.TicketDetail.go(ticket.id))
                         }
                     }
@@ -309,14 +217,154 @@ fun DashboardScreen(navController: NavController) {
     }
 }
 
-private data class SecondaryStat(
-    val label: String,
-    val value: String,
-    val icon: ImageVector,
-    val bg: Color,
-    val fg: Color,
-    val onClick: (() -> Unit)?
-)
+@Composable
+private fun NowCard(
+    timer: TimerSnapshot?,
+    nowMs: Long,
+    featured: TicketSummary?,
+    canWrite: Boolean,
+    onOpen: (Int) -> Unit,
+    onPauseResume: (TimerSnapshot) -> Unit,
+    onStart: (TicketSummary) -> Unit,
+) {
+    when {
+        timer != null -> {
+            val on = MaterialTheme.colorScheme.onPrimaryContainer
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        if (timer.running) "NOW" else "PAUSED",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = on.copy(alpha = 0.75f)
+                    )
+                    Text(
+                        formatClock(timer.elapsedSec(nowMs)),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = on
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "#${timer.number} · ${timer.subject}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        color = on
+                    )
+                    timer.client?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = on.copy(alpha = 0.75f), maxLines = 1)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { onPauseResume(timer) }, modifier = Modifier.weight(1f)) {
+                            Icon(if (timer.running) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (timer.running) "Pause" else "Resume")
+                        }
+                        Button(onClick = { onOpen(timer.ticketId) }, modifier = Modifier.weight(1f)) {
+                            Text("Open ticket")
+                        }
+                    }
+                }
+            }
+        }
+        featured != null -> {
+            val priorityColor = MaterialTheme.statusColors.forPriority(featured.priority)
+            val overdue = isOverdue(featured, nowMs)
+            Card(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Row(Modifier.padding(16.dp).height(IntrinsicSize.Min)) {
+                    Surface(color = priorityColor, shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.width(4.dp).fillMaxHeight()) {}
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "UP NEXT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "#${featured.number} · ${featured.subject}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2
+                        )
+                        val meta = listOfNotNull(
+                            featured.client?.takeIf { it.isNotBlank() },
+                            featured.dueAt?.takeIf { it.isNotBlank() }?.let { (if (overdue) "Was due " else "Due ") + fmtDate(it) }
+                        ).joinToString(" · ")
+                        if (meta.isNotEmpty()) {
+                            Text(
+                                meta,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                                maxLines = 2
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (canWrite) {
+                                Button(onClick = { onStart(featured) }, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Outlined.PlayCircle, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Start")
+                                }
+                            }
+                            OutlinedButton(onClick = { onOpen(featured.id) }, modifier = Modifier.weight(1f)) { Text("Open") }
+                        }
+                    }
+                }
+            }
+        }
+        else -> {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Queue is clear", style = MaterialTheme.typography.titleSmall)
+                        Text("No tickets assigned to you", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One compact row of counts. A count of zero says nothing, so it gets no chip. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatChips(
+    overdue: Int, alerts: Int, appointments: Int, allOpen: Int, onsite: Int,
+    onTickets: () -> Unit, onAlerts: () -> Unit, onAppointments: () -> Unit,
+) {
+    val chips = buildList<Triple<String, Boolean, () -> Unit>> {
+        if (overdue > 0) add(Triple("$overdue overdue", true, onTickets))
+        if (alerts > 0) add(Triple("$alerts alert${if (alerts != 1) "s" else ""}", true, onAlerts))
+        if (appointments > 0) add(Triple("$appointments appt${if (appointments != 1) "s" else ""} today", false, onAppointments))
+        if (onsite > 0) add(Triple("$onsite on-site", false, onTickets))
+        if (allOpen > 0) add(Triple("$allOpen open", false, onTickets))
+    }
+    if (chips.isEmpty()) return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        chips.forEach { (label, urgent, onClick) ->
+            AssistChip(
+                onClick = onClick,
+                label = { Text(label) },
+                colors = if (urgent) AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    labelColor = MaterialTheme.colorScheme.onErrorContainer
+                ) else AssistChipDefaults.assistChipColors()
+            )
+        }
+    }
+}
 
 @Composable
 private fun QuickActionsRow(navController: NavController) {
@@ -388,85 +436,6 @@ private fun QuickActionsRow(navController: NavController) {
 }
 
 @Composable
-private fun MyOpenHeroCard(value: Int, onClick: () -> Unit) {
-    val gradient = Brush.linearGradient(
-        listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.tertiaryContainer),
-        start = Offset.Zero,
-        end = Offset.Infinite
-    )
-    val onColor = MaterialTheme.colorScheme.onPrimaryContainer
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(gradient)
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(52.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Outlined.Person, null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    value.toString(),
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.W800,
-                    color = onColor
-                )
-                Text(
-                    "tickets in My Open",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = onColor.copy(alpha = 0.8f)
-                )
-            }
-            Icon(Icons.Outlined.ChevronRight, null, tint = onColor)
-        }
-    }
-}
-
-@Composable
-private fun StatCard(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    bg: Color,
-    fg: Color,
-    modifier: Modifier,
-    onClick: (() -> Unit)? = null
-) {
-    val base = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
-    Surface(color = bg, shape = MaterialTheme.shapes.large, modifier = base) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Icon(icon, null, tint = fg.copy(alpha = 0.65f), modifier = Modifier.size(18.dp))
-            Spacer(Modifier.height(10.dp))
-            Text(
-                value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = fg
-            )
-            Text(label, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.75f))
-        }
-    }
-}
-
-@Composable
 private fun AppointmentSummaryCard(appt: Appointment, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -494,16 +463,16 @@ private fun AppointmentSummaryCard(appt: Appointment, onClick: () -> Unit) {
 }
 
 @Composable
-private fun QueueTicketCard(ticket: TicketSummary, onClick: () -> Unit) {
+private fun QueueTicketCard(ticket: TicketSummary, overdue: Boolean, onClick: () -> Unit) {
     val priorityColor = MaterialTheme.statusColors.forPriority(ticket.priority)
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 color = priorityColor,
                 shape = MaterialTheme.shapes.extraSmall,
-                modifier = Modifier.width(4.dp).height(56.dp)
+                modifier = Modifier.width(4.dp).height(44.dp)
             ) {}
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -512,46 +481,27 @@ private fun QueueTicketCard(ticket: TicketSummary, onClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
-                    ticket.assignedTo?.let { assigned ->
+                    if (overdue) {
                         Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Outlined.Person, null, Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.outline)
-                        Spacer(Modifier.width(2.dp))
-                        Text(assigned, style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline)
+                        Text(
+                            "Overdue",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
-                Spacer(Modifier.height(3.dp))
                 Text(
                     ticket.subject,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 2
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Business, null, Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.outline)
-                    Spacer(Modifier.width(4.dp))
-                    Text(ticket.client ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline)
+                ticket.client?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, maxLines = 1)
                 }
             }
-            Spacer(Modifier.width(8.dp))
-            ticket.status?.let { status ->
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        status,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
         }
     }
 }

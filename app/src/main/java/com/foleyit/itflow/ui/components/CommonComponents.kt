@@ -137,3 +137,9 @@ fun SectionLabel(text: String) {
         modifier = Modifier.padding(vertical = 4.dp)
     )
 }
+
+/**
+ * Bottom list padding that lets the last row scroll clear of the FAB. Lists run underneath the
+ * floating bottom nav while the FAB floats above it, so this covers both heights (measured on device).
+ */
+val FabClearance = 168.dp

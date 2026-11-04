@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.foleyit.itflow.ui.components.FabClearance
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
 import com.foleyit.itflow.ui.components.EmptyScreen
@@ -142,7 +143,7 @@ fun AssetsScreen(navController: NavController) {
                 displayedItems.isEmpty() && !ls.hasMore -> EmptyScreen("No assets found", Icons.Outlined.Devices)
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FabClearance),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (ls.isRefreshing || ls.error != null) {

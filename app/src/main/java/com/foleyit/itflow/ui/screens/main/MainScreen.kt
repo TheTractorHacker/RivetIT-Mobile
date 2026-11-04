@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
@@ -273,6 +274,11 @@ fun MainScreen(
         if (!isOnline) {
             OfflineBanner()
         }
+        // The timer follows the technician: on the other tabs a thin strip shows it while it runs
+        // (Home has its own Now card, and ticket screens carry their own timer bar).
+        if (isRootScreen && currentRoute != Screen.Dashboard.route) {
+            RunningTimerStrip(onOpen = { id -> navController.navigate(Screen.TicketDetail.go(id)) })
+        }
         androidx.compose.runtime.CompositionLocalProvider(
             com.foleyit.itflow.data.LocalCapabilities provides capabilities
         ) {
@@ -369,4 +375,46 @@ private fun RequireView(
 ) {
     if (capabilities.canView(module)) content()
     else com.foleyit.itflow.ui.components.EmptyScreen("You don't have access to this section", Icons.Outlined.Lock)
+}
+
+@Composable
+private fun RunningTimerStrip(onOpen: (Int) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) { com.foleyit.itflow.data.timer.ActiveTimer.ensureLoaded(context) }
+    val timer by com.foleyit.itflow.data.timer.ActiveTimer.state.collectAsState()
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timer?.running) {
+        while (timer?.running == true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val t = timer ?: return
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.fillMaxWidth().clickable { onOpen(t.ticketId) }
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Outlined.Timer, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                com.foleyit.itflow.data.timer.formatClock(t.elapsedSec(nowMs)),
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                (if (t.running) "" else "Paused · ") + "#${t.number} ${t.subject}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 }
