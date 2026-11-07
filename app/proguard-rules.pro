@@ -29,3 +29,9 @@
 # ── Compose ──────────────────────────────────────────────────────────────────
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
+
+# ── Room / WorkManager ───────────────────────────────────────────────────────
+# The release build resolves room-runtime 2.2.5, whose own rule keeps RoomDatabase subclasses but not their no-arg
+# constructor. R8 full mode then strips WorkDatabase_Impl.<init>() and WorkManager's startup initialiser crashes the
+# app at launch ("Failed to create an instance of androidx.work.impl.WorkDatabase"). Room creates these reflectively.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
