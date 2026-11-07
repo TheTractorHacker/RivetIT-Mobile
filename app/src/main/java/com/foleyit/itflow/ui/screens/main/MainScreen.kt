@@ -194,6 +194,9 @@ fun MainScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // The menu opens from its button only. A swipe-to-open drag listens across the whole screen, so any slightly
+        // sideways scroll in a list, chip row or article pulled the menu out. Swiping it shut again still works.
+        gesturesEnabled = drawerState.currentValue == DrawerValue.Open || drawerState.targetValue == DrawerValue.Open,
         drawerContent = {
             AppDrawerContent(
                 userName = userName,
