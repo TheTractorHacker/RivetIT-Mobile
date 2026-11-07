@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.foleyit.itflow.ui.components.CollapsingHeaderColumn
 import com.foleyit.itflow.ui.components.FabClearance
 import androidx.navigation.NavController
 import com.foleyit.itflow.data.api.ApiClient
@@ -111,7 +112,7 @@ fun TicketsScreen(navController: NavController) {
         }
     ) { scaffoldPadding ->
     // Only use bottom padding — top is handled by the outer MainScreen Scaffold
-    Column(Modifier.fillMaxSize().padding(bottom = scaffoldPadding.calculateBottomPadding())) {
+    CollapsingHeaderColumn(Modifier.fillMaxSize().padding(bottom = scaffoldPadding.calculateBottomPadding()), header = {
         // Compact search + Mine filter
         // FlowRow: at large text sizes the Mine chip and icons drop to a second line instead of squeezing the field
         // until "Search" wraps letter by letter.
@@ -229,6 +230,7 @@ fun TicketsScreen(navController: NavController) {
             }
         }
 
+    }) {
         val ls = list.state
         if (ls.items.isNotEmpty() && ls.isRefreshing) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -251,8 +253,9 @@ fun TicketsScreen(navController: NavController) {
             selectedTab == 0 -> {
                 // Open tickets — grouped by status
                 val tickets = ls.items
-                val statusOrder = tickets.map { it.status ?: "Unknown" }.distinct()
-                val grouped = tickets.groupBy { it.status ?: "Unknown" }
+                // Grouped once per page of results, not on every recomposition while scrolling. groupBy keeps first-seen order.
+                val grouped = remember(tickets) { tickets.groupBy { it.status ?: "Unknown" } }
+                val statusOrder = remember(grouped) { grouped.keys.toList() }
                 LazyColumn(state = openListState, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = FabClearance)) {
                     statusOrder.forEach { status ->
                         val group = grouped[status] ?: return@forEach
