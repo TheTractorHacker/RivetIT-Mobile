@@ -246,9 +246,12 @@ public struct CreateTicketRequest: Encodable {
     public var assignedTo: Int?
     public var categoryId: Int?
     public var contactId: Int?
+    /// The asset the ticket is about; the server checks it belongs to `clientId`.
+    public var assetId: Int?
     public init(subject: String, details: String = "", clientId: Int? = nil, priority: String = "low",
-                assignedTo: Int? = nil, categoryId: Int? = nil, contactId: Int? = nil) {
+                assignedTo: Int? = nil, categoryId: Int? = nil, contactId: Int? = nil, assetId: Int? = nil) {
         self.contactId = contactId
+        self.assetId = assetId
         self.subject = subject; self.details = details; self.clientId = clientId; self.priority = priority
         self.assignedTo = assignedTo; self.categoryId = categoryId
     }
@@ -336,6 +339,9 @@ public struct ClientSummary: Decodable, Identifiable, Hashable {
     public let city: String?
     public let state: String?
     public let website: String?
+    public init(id: Int, name: String, phone: String? = nil, city: String? = nil, state: String? = nil, website: String? = nil) {
+        self.id = id; self.name = name; self.phone = phone; self.city = city; self.state = state; self.website = website
+    }
 }
 
 public struct ClientDetail: Decodable, Hashable {
@@ -411,6 +417,11 @@ public struct AssetSummary: Decodable, Identifiable, Hashable {
     public let os: String?
     public let status: String?
     public let client: String?
+    public init(id: Int, name: String, tag: String? = nil, type: String? = nil, make: String? = nil, model: String? = nil,
+                serial: String? = nil, os: String? = nil, status: String? = nil, client: String? = nil) {
+        self.id = id; self.name = name; self.tag = tag; self.type = type; self.make = make; self.model = model
+        self.serial = serial; self.os = os; self.status = status; self.client = client
+    }
 }
 
 public struct AssetDetail: Decodable, Hashable {
@@ -431,6 +442,8 @@ public struct AssetDetail: Decodable, Hashable {
     public let contactName: String?
     public let contactPhone: String?
     public let client: String?
+    /// The department the asset belongs to (the app calls clients departments).
+    public let clientId: Int?
     public let createdAt: String?
     public let purchaseDate: String?
     public let warrantyExpire: String?

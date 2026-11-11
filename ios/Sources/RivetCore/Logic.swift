@@ -85,6 +85,8 @@ public enum AppRoute: Equatable, Hashable {
     case kb, kbArticle(Int)
     /// In-app only (the new-ticket form); never produced by `DeepLinks.resolve`.
     case createTicket
+    /// In-app only: the new-ticket form started from an asset's page, with its department filled in.
+    case createTicketForAsset(id: Int, name: String, clientId: Int, clientName: String?)
 }
 
 public enum DeepLinks {

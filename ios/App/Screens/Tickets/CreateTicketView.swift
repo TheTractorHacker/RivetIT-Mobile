@@ -8,6 +8,8 @@ import RivetCore
     @State private var details = ""
     @State private var priority = "low"
     @State private var department: ClientSummary?
+    @State private var asset: AssetSummary?
+    @State private var showAssets = false
     @State private var category: TicketCategory?
     @State private var contact: Contact?
     @State private var showContacts = false
@@ -15,6 +17,12 @@ import RivetCore
     @State private var showCategories = false
     @State private var saving = false
     @State private var error: String?
+
+    /// Set when the form is opened from an asset's page: the asset and its department are already chosen.
+    init(presetAsset: AssetSummary? = nil, presetDepartment: ClientSummary? = nil) {
+        _asset = State(initialValue: presetDepartment == nil ? nil : presetAsset)
+        _department = State(initialValue: presetDepartment)
+    }
 
     private var canCreate: Bool { !saving && !subject.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -37,9 +45,12 @@ import RivetCore
                     TextField("Description", text: $details, axis: .vertical).lineLimit(4...8).padding(16)
                 }.background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous)).padding(.horizontal, 16)
 
-                SectionLabel(text: "Department · Contact · Category")
+                SectionLabel(text: "Department · Asset · Contact · Category")
                 VStack(spacing: 0) {
                     pickRow("building.2", department?.name ?? "Select department (optional)", set: department != nil) { showDepartments = true }
+                    Divider().padding(.leading, 46)
+                    pickRow("desktopcomputer", asset.map { $0.tag ?? $0.name } ?? (department != nil ? "Select asset (optional)" : "Pick a department to choose an asset"),
+                            set: asset != nil) { if department != nil { showAssets = true } }
                     Divider().padding(.leading, 46)
                     pickRow("person", contact?.name ?? (department != nil ? "Primary contact (tap to search)" : "Search contacts (optional)"), set: contact != nil) { showContacts = true }
                     Divider().padding(.leading, 46)
@@ -63,9 +74,14 @@ import RivetCore
         }
         .sheet(isPresented: $showDepartments) {
             DepartmentPicker { picked in
-                if department?.id != picked.id { contact = nil }
+                if department?.id != picked.id { contact = nil; asset = nil }
                 department = picked; showDepartments = false
             }.presentationDetents([.large])
+        }
+        .sheet(isPresented: $showAssets) {
+            if let dept = department {
+                AssetPicker(clientId: dept.id, selected: asset) { asset = $0; showAssets = false }.presentationDetents([.large])
+            }
         }
         .sheet(isPresented: $showContacts) {
             ContactPicker(clientId: department?.id) { picked in
@@ -95,7 +111,7 @@ import RivetCore
         saving = true; error = nil
         let body = CreateTicketRequest(subject: subject.trimmingCharacters(in: .whitespaces), details: details,
                                        clientId: department?.id, priority: priority, categoryId: category?.id,
-                                       contactId: contact?.id)
+                                       contactId: contact?.id, assetId: asset?.id)
         Task {
             defer { saving = false }
             do {
@@ -230,5 +246,55 @@ import RivetCore
     private func load() async {
         guard let api = session.api else { return }
         await loader.load { try await api.categories() }
+    }
+}
+
+/// The chosen department's assets, filtered on the phone (a department rarely has more than a few hundred).
+@MainActor struct AssetPicker: View {
+    let clientId: Int
+    let selected: AssetSummary?
+    var onPick: (AssetSummary?) -> Void
+    @EnvironmentObject var session: Session
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var loader = Loader<[AssetSummary]>()
+    @State private var search = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                SearchField(placeholder: "Search assets…", text: $search).padding(16)
+                LoadView(loader: loader, retry: load) { items in
+                    let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+                    let shown = q.isEmpty ? items : items.filter {
+                        [$0.name, $0.tag, $0.serial, $0.type, $0.make, $0.model].compactMap { $0?.lowercased() }.contains { $0.contains(q) }
+                    }
+                    List {
+                        Button("No asset") { onPick(nil) }.foregroundColor(Palette.label2)
+                        if shown.isEmpty { Text("No assets found").foregroundColor(Palette.label2) }
+                        ForEach(shown) { a in
+                            Button { onPick(a) } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(a.tag ?? a.name)
+                                        let sub = [a.type, a.make, a.model].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                                        if !sub.isEmpty { Text(sub).font(.caption).foregroundColor(Palette.label2) }
+                                    }
+                                    Spacer()
+                                    if a.id == selected?.id { Image(systemName: "checkmark") }
+                                }
+                            }.buttonStyle(.plain)
+                        }
+                    }.listStyle(.plain)
+                }
+            }
+            .navigationTitle("Asset").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .task { await load() }
+        }
+    }
+
+    private func load() async {
+        guard let api = session.api else { return }
+        await loader.load { try await api.clientAssets(clientId) }
     }
 }

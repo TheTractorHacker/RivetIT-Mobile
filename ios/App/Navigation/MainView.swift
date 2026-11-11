@@ -80,6 +80,9 @@ import RivetCore
         switch route {
         case .tickets: TicketsView()
         case .createTicket: CreateTicketView()
+        case .createTicketForAsset(let id, let name, let clientId, let clientName):
+            CreateTicketView(presetAsset: AssetSummary(id: id, name: name, client: clientName),
+                             presetDepartment: ClientSummary(id: clientId, name: clientName ?? "Department"))
         case .ticket(let id): TicketDetailView(id: id)
         case .ticketChat(let id): TicketChatView(ticketId: id)
         case .clients: ClientsView()

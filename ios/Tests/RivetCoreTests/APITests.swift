@@ -131,6 +131,24 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(obj["onsite"] as? Int, 0)
     }
 
+    func testCreateTicketForAssetSendsAssetAndClientIds() async throws {
+        let t = MockTransport(); t.body = Data(#"{"id":77}"#.utf8)
+        let client = APIClient(serverURL: server, token: "abc", transport: t)
+        let created = try await client.createTicket(CreateTicketRequest(subject: "Screen flickers", clientId: 4, assetId: 109))
+        XCTAssertEqual(created.id, 77)
+        XCTAssertTrue(t.requests[0].url!.absoluteString.hasSuffix("/api/v1/tickets"))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(t.requests[0].httpBody)) as? [String: Any])
+        XCTAssertEqual(obj["asset_id"] as? Int, 109); XCTAssertEqual(obj["client_id"] as? Int, 4)
+    }
+
+    func testAssetDetailCarriesItsDepartmentId() throws {
+        let json = #"{"id":109,"name":"AP-HQ-01","client":"Executive Office","client_id":4}"#
+        let a = try decode(AssetDetail.self, json)
+        XCTAssertEqual(a.clientId, 4)
+        // an older server without client_id still decodes (the Create ticket button just stays hidden)
+        XCTAssertNil(try decode(AssetDetail.self, Fixtures.asset).clientId)
+    }
+
     func testStatusChangeBody() async throws {
         let t = MockTransport(); t.body = Data("{}".utf8)
         try await APIClient(serverURL: server, token: "abc", transport: t).setStatus(ticketId: 9, statusId: 5)
