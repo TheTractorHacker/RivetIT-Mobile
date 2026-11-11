@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateTicketScreen(navController: NavController) {
+fun CreateTicketScreen(navController: NavController, presetAssetId: Int = 0) {
     var subject by rememberSaveable { mutableStateOf("") }
     var details by rememberSaveable { mutableStateOf("") }
     var priority by rememberSaveable { mutableStateOf("low") }
@@ -60,13 +60,20 @@ fun CreateTicketScreen(navController: NavController) {
     var categoryLoadAttempt by remember { mutableIntStateOf(0) }
     var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var selectedAssetId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedAssetName by rememberSaveable { mutableStateOf("") }
+    var assets by remember { mutableStateOf<Result<com.foleyit.itflow.data.api.AssetsResponse>?>(null) }
+    var assetSearch by remember { mutableStateOf("") }
+    var assetLoadAttempt by remember { mutableIntStateOf(0) }
+    var showAssetPicker by remember { mutableStateOf(false) }
+    var presetLoaded by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDiscardConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val hasDraft = subject.isNotBlank() || details.isNotBlank() || priority != "low" ||
-        selectedClientId != null || selectedCategoryId != null || selectedContactId != null
+        selectedClientId != null || selectedCategoryId != null || selectedContactId != null || selectedAssetId != null
 
     fun goBack() {
         if (saving) return
@@ -94,6 +101,28 @@ fun CreateTicketScreen(navController: NavController) {
         if (contactSearch.isNotBlank()) delay(250)
         contacts = try {
             Result.success(ApiClient.service().getContacts(clientId = selectedClientId, search = contactSearch.trim()))
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+    }
+
+    // Opened from an asset ("Create ticket" on the asset screen): fill in the asset and its department.
+    LaunchedEffect(presetAssetId) {
+        if (presetAssetId <= 0 || presetLoaded) return@LaunchedEffect
+        try {
+            val a = ApiClient.service().getAsset(presetAssetId)
+            selectedAssetId = a.id; selectedAssetName = a.name
+            if (a.clientId != null) { selectedClientId = a.clientId; selectedClientName = a.client.orEmpty() }
+            presetLoaded = true
+        } catch (e: CancellationException) { throw e } catch (e: Exception) {
+            error = "Could not load the asset: ${userMessage(e)}"
+        }
+    }
+
+    LaunchedEffect(showAssetPicker, assetSearch, assetLoadAttempt, selectedClientId) {
+        if (!showAssetPicker) return@LaunchedEffect
+        assets = null
+        if (assetSearch.isNotBlank()) delay(250)
+        assets = try {
+            Result.success(ApiClient.service().getAssets(search = assetSearch.trim(), page = 1, clientId = selectedClientId))
         } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
     }
 
@@ -137,14 +166,15 @@ fun CreateTicketScreen(navController: NavController) {
                         clientId = selectedClientId,
                         priority = priority,
                         categoryId = selectedCategoryId,
-                        contactId = selectedContactId
+                        contactId = selectedContactId,
+                        assetId = selectedAssetId
                     )
                 )
                 val ticketId = created["id"]?.takeIf { it > 0 }
                     ?: throw IllegalStateException("Server did not return a ticket ID")
                 ApiClient.invalidateTicketResponses()
                 navController.navigate(Screen.TicketDetail.go(ticketId)) {
-                    popUpTo(Screen.CreateTicket.route) { inclusive = true }
+                    popUpTo(navController.currentBackStackEntry?.destination?.route ?: Screen.CreateTicket.route) { inclusive = true }
                 }
             } catch (e: Exception) {
                 error = "Could not confirm ticket creation. Check Tickets before trying again: ${userMessage(e)}"
@@ -168,7 +198,7 @@ fun CreateTicketScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Spacer(Modifier.height(8.dp))
-                Surface(onClick = { selectedClientId = null; selectedClientName = ""; selectedContactId = null; selectedContactName = ""; showClientPicker = false },
+                Surface(onClick = { selectedClientId = null; selectedClientName = ""; selectedContactId = null; selectedContactName = ""; selectedAssetId = null; selectedAssetName = ""; showClientPicker = false },
                     modifier = Modifier.fillMaxWidth()) {
                     Text("— No Department —", Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.outline)
@@ -187,7 +217,7 @@ fun CreateTicketScreen(navController: NavController) {
                         LazyColumn(Modifier.heightIn(max = 480.dp)) {
                             items(response.data, key = { it.id }) { c ->
                                 Surface(onClick = {
-                                    if (selectedClientId != c.id) { selectedContactId = null; selectedContactName = "" }
+                                    if (selectedClientId != c.id) { selectedContactId = null; selectedContactName = ""; selectedAssetId = null; selectedAssetName = "" }
                                     selectedClientId = c.id; selectedClientName = c.name; showClientPicker = false
                                 }, modifier = Modifier.fillMaxWidth()) {
                                     Text(c.name, Modifier.padding(16.dp))
@@ -262,6 +292,66 @@ fun CreateTicketScreen(navController: NavController) {
                             Text("Search by name or email to find more contacts.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAssetPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showAssetPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(Modifier.heightIn(max = 600.dp).padding(16.dp).navigationBarsPadding()) {
+                Text("Select Asset", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(if (selectedClientId != null) "Assets of ${selectedClientName.ifBlank { "this department" }}" else "All assets (picking one also sets the department)",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = assetSearch, onValueChange = { assetSearch = it },
+                    label = { Text("Search assets") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(onClick = { selectedAssetId = null; selectedAssetName = ""; showAssetPicker = false }, modifier = Modifier.fillMaxWidth()) {
+                    Text("— No Asset —", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.outline)
+                }
+                HorizontalDivider()
+                when {
+                    assets == null -> CircularProgressIndicator(Modifier.padding(16.dp).size(24.dp))
+                    assets!!.isFailure -> {
+                        Text("Could not load assets: ${userMessage(assets!!.exceptionOrNull()!!)}",
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { assets = null; assetLoadAttempt++ }) { Text("Retry") }
+                    }
+                    else -> {
+                        val response = assets!!.getOrThrow()
+                        if (response.data.isEmpty()) Text("No assets found", Modifier.padding(16.dp))
+                        LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                            items(response.data, key = { it.id }) { a ->
+                                Surface(onClick = {
+                                    // An asset belongs to one department: choosing it sets the department too.
+                                    if (a.clientId != null && selectedClientId != a.clientId) {
+                                        selectedClientId = a.clientId; selectedClientName = a.client.orEmpty()
+                                        selectedContactId = null; selectedContactName = ""
+                                    }
+                                    selectedAssetId = a.id; selectedAssetName = a.name; showAssetPicker = false
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(a.name)
+                                        val sub = listOfNotNull(a.type, a.client.takeIf { selectedClientId == null }).filter { it.isNotBlank() }.joinToString(" · ")
+                                        if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                        if (response.total > response.data.size) {
+                            Text("Search by name to find more assets.", style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
@@ -448,6 +538,29 @@ fun CreateTicketScreen(navController: NavController) {
                                     selectedContactName.ifBlank { if (selectedClientId != null) "Primary contact (tap to search)" else "Search contacts (optional)" },
                                     color = if (selectedContactName.isBlank()) MaterialTheme.colorScheme.outline
                                             else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                    Column(
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SectionLabel("Asset")
+                        Surface(
+                            onClick = { assetSearch = ""; showAssetPicker = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Devices, null, tint = MaterialTheme.colorScheme.outline)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    selectedAssetName.ifBlank { "Link an asset (optional)" },
+                                    color = if (selectedAssetName.isBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)

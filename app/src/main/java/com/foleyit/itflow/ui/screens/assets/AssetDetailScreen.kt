@@ -42,6 +42,16 @@ fun AssetDetailScreen(id: Int, navController: NavController) {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    // Only once the asset has loaded: the new ticket needs the asset's department.
+                    if (state?.getOrNull()?.clientId != null) {
+                        TextButton(onClick = { navController.navigate(com.foleyit.itflow.ui.navigation.Screen.CreateTicketForAsset.go(id)) }) {
+                            Icon(Icons.Outlined.ConfirmationNumber, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Create ticket")
+                        }
+                    }
                 }
             )
         },
