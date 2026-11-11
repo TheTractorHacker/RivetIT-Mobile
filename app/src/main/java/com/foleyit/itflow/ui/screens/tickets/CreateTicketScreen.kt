@@ -524,6 +524,30 @@ fun CreateTicketScreen(navController: NavController, presetAssetId: Int = 0) {
                         Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        SectionLabel("Asset")
+                        Surface(
+                            onClick = { assetSearch = ""; showAssetPicker = true },
+                            enabled = selectedClientId != null,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Devices, null, tint = MaterialTheme.colorScheme.outline)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    selectedAssetName.ifBlank { if (selectedClientId == null) "Choose a department first" else "Link an asset (optional)" },
+                                    color = if (selectedAssetName.isBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                    Column(
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         SectionLabel("Contact")
                         Surface(
                             onClick = { contactSearch = ""; showContactPicker = true },
@@ -538,29 +562,6 @@ fun CreateTicketScreen(navController: NavController, presetAssetId: Int = 0) {
                                     selectedContactName.ifBlank { if (selectedClientId != null) "Primary contact (tap to search)" else "Search contacts (optional)" },
                                     color = if (selectedContactName.isBlank()) MaterialTheme.colorScheme.outline
                                             else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
-                            }
-                        }
-                    }
-                    Column(
-                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SectionLabel("Asset")
-                        Surface(
-                            onClick = { assetSearch = ""; showAssetPicker = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                        ) {
-                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.Devices, null, tint = MaterialTheme.colorScheme.outline)
-                                Spacer(Modifier.width(12.dp))
-                                Text(
-                                    selectedAssetName.ifBlank { "Link an asset (optional)" },
-                                    color = if (selectedAssetName.isBlank()) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.outline)
