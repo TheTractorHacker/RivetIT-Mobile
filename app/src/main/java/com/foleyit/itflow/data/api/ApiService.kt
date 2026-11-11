@@ -199,7 +199,8 @@ interface ApiService {
     suspend fun getAssets(
         @Query("search") search: String = "",
         @Query("page") page: Int = 1,
-        @Query("type") type: String = ""
+        @Query("type") type: String = "",
+        @Query("client_id") clientId: Int? = null
     ): AssetsResponse
 
     @GET("assets/types")

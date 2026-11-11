@@ -124,7 +124,8 @@ data class AssetsResponse(override val data: List<AssetSummary>, override val to
 data class AssetSummary(
     val id: Int, val name: String, val tag: String?, val type: String?,
     val make: String?, val model: String?, val serial: String?,
-    val os: String?, val status: String?, val client: String?
+    val os: String?, val status: String?, val client: String?,
+    @SerializedName("client_id") val clientId: Int? = null
 )
 
 data class AssetDetail(
@@ -138,6 +139,7 @@ data class AssetDetail(
     @SerializedName("contact_name") val contactName: String?,
     @SerializedName("contact_phone") val contactPhone: String?,
     val client: String?,
+    @SerializedName("client_id") val clientId: Int? = null,
     @SerializedName("created_at") val createdAt: String?,
     @SerializedName("purchase_date") val purchaseDate: String?,
     @SerializedName("warranty_expire") val warrantyExpire: String?,
@@ -455,7 +457,8 @@ data class CreateTicketRequest(
     val priority: String = "low",
     @SerializedName("assigned_to") val assignedTo: Int? = null,
     @SerializedName("category_id") val categoryId: Int? = null,
-    @SerializedName("contact_id") val contactId: Int? = null
+    @SerializedName("contact_id") val contactId: Int? = null,
+    @SerializedName("asset_id") val assetId: Int? = null
 )
 
 // ── Search ───────────────────────────────────────────────────────────────────

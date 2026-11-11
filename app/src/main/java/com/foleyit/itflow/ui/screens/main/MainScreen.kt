@@ -345,6 +345,9 @@ fun MainScreen(
                 OuttakeSignScreen(it.arguments?.getString("id")?.toIntOrNull() ?: 0, navController)
             }
             composable(Screen.CreateTicket.route) { CreateTicketScreen(navController) }
+            composable(Screen.CreateTicketForAsset.route) {
+                CreateTicketScreen(navController, presetAssetId = it.arguments?.getString("id")?.toIntOrNull() ?: 0)
+            }
             composable(Screen.Search.route) { SearchScreen(navController) }
             composable(Screen.TimeReport.route) { TimeSummaryScreen(navController) }
             composable(Screen.ReportsHub.route) { ReportsHubScreen(navController) }
