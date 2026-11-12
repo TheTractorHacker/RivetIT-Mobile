@@ -14,7 +14,7 @@ private val gson = Gson()
  * instead, since they can leak backend/network internals.
  */
 fun userMessage(e: Throwable): String = when (e) {
-    is HttpException -> {
+    is HttpException -> if (e.code() == 429) rateLimitMessage(retryAfterSeconds(e)) else {
         val backendMessage = try {
             e.response()?.errorBody()?.string()
                 ?.let { gson.fromJson(it, ApiErrorBody::class.java)?.error }

@@ -14,6 +14,14 @@ import RivetCore
     @State private var showPassword = false
     @State private var toast: String?
     @State private var asked = false
+    // Step-up key enrolment prompt: the server wants the password (and a code on MFA accounts) to accept a key.
+    @State private var showEnrol = false
+    @State private var enrolNeedsCode = false
+    @State private var enrolBusy = false
+    @State private var enrolError: String?
+    @State private var enrolPassword = ""
+    @State private var enrolCode = ""
+    @State private var pendingPEM: String?
 
     var body: some View {
         Group {
@@ -32,6 +40,53 @@ import RivetCore
             }
         }
         .animation(.default, value: toast)
+        .sheet(isPresented: $showEnrol, onDismiss: clearEnrolFields) { enrolSheet }
+    }
+
+    private func clearEnrolFields() { enrolPassword = ""; enrolCode = ""; enrolError = nil; enrolNeedsCode = false; pendingPEM = nil }
+
+    private var enrolSheet: some View {
+        NavigationView {
+            Form {
+                Section(footer: Text("To register this device for viewing credentials, enter your account password" + (enrolNeedsCode ? " and a code." : ".")).font(.footnote)) {
+                    SecureField("Current password", text: $enrolPassword)
+                        .textContentType(.none).autocorrectionDisabled().textInputAutocapitalization(.never)
+                    if enrolNeedsCode {
+                        SecureField("Authenticator or recovery code", text: $enrolCode)
+                            .textContentType(.none).autocorrectionDisabled().textInputAutocapitalization(.never)
+                    }
+                }
+                if let enrolError { Section { InlineError(message: enrolError) } }
+            }
+            .navigationTitle("Confirm it's you").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showEnrol = false }.disabled(enrolBusy) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { Task { await submitEnrol() } } label: { if enrolBusy { ProgressView() } else { Text("Continue") } }
+                        .disabled(enrolBusy || enrolPassword.isEmpty || (enrolNeedsCode && enrolCode.trimmingCharacters(in: .whitespaces).isEmpty))
+                }
+            }
+        }
+        .interactiveDismissDisabled(enrolBusy)
+    }
+
+    /// Registers the key with the typed proof. The password lives only in this view's state and is wiped when the sheet closes.
+    private func submitEnrol() async {
+        guard !enrolBusy, let api = session.api, let pem = pendingPEM else { return }
+        enrolBusy = true; enrolError = nil
+        defer { enrolBusy = false }
+        let code = enrolNeedsCode ? enrolCode.trimmingCharacters(in: .whitespaces) : nil
+        do {
+            try await api.registerBiometricKey(pem: pem, currentPassword: enrolPassword, totpCode: code)
+            showEnrol = false
+            await reveal()      // the key is accepted; the first challenge was spent, so start a fresh one
+        } catch {
+            switch classifyEnrolFailure(error) {
+            case .needsCode(let m): enrolNeedsCode = true; enrolError = m
+            case .wrongPassword(let m), .rateLimited(let m): enrolError = m
+            case .other(let m): showEnrol = false; self.error = m
+            }
+        }
     }
 
     private var gate: some View {
@@ -153,9 +208,14 @@ import RivetCore
             let assertion = try await Task.detached(priority: .userInitiated) {
                 try BiometricSigner.sign(challenge: bytes, reason: "Show this credential")
             }.value
-            // Idempotent; covers the first use and a key recreated after a reset.
-            try await api.registerBiometricKey(pem: assertion.publicKeyPEM)
-            detail = try await api.credential(id: id, challengeToken: challenge.challengeToken, signature: assertion.signatureBase64)
+            do {
+                detail = try await api.credential(id: id, challengeToken: challenge.challengeToken, signature: assertion.signatureBase64)
+            } catch let e where revealNeedsKeyEnrolment(e) {
+                // No key on the server for this device (first use, or it was recreated): ask for the password
+                // (and a code on MFA accounts), enrol the key, then run the step-up again.
+                pendingPEM = assertion.publicKeyPEM
+                showEnrol = true
+            }
         } catch BiometricSignerError.cancelled {
             // Stay on the gate; the Verify button tries again.
         } catch let e as BiometricSignerError {

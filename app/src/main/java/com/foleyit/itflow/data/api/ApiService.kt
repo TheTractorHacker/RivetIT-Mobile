@@ -315,6 +315,7 @@ interface ApiService {
     @PUT("me")
     suspend fun registerFcmToken(@Body body: FcmTokenRequest)
 
+    @Headers("${ApiClient.KEEP_SESSION_ON_401}: 1")
     @PUT("me")
     suspend fun registerBiometricKey(@Body body: BiometricKeyRequest)
 

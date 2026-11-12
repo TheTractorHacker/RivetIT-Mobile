@@ -18,6 +18,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.foleyit.itflow.ui.util.generatePassword
 import com.foleyit.itflow.ui.util.openWebUrl
 import com.foleyit.itflow.ui.util.userMessage
+import com.foleyit.itflow.ui.util.EnrolFailure
+import com.foleyit.itflow.ui.util.classifyEnrolFailure
+import com.foleyit.itflow.ui.util.revealNeedsKeyEnrolment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -38,6 +41,11 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
     var state by remember { mutableStateOf<Result<CredentialDetail>?>(null) }
     var authError by remember { mutableStateOf<String?>(null) }
     var showPassword by remember { mutableStateOf(false) }
+    // Step-up key enrolment prompt (the server wants the password, and a code on MFA accounts, to accept a key).
+    var showEnrol by remember { mutableStateOf(false) }
+    var enrolNeedsCode by remember { mutableStateOf(false) }
+    var enrolBusy by remember { mutableStateOf(false) }
+    var enrolError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
@@ -76,21 +84,22 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                     }
                     scope.launch {
                         try {
-                            // Idempotent - cheap to always (re-)register in case this
-                            // is the first use, or the key was regenerated after a
-                            // biometric-enrollment invalidation.
-                            val pub = BiometricSigningKey.getOrCreatePublicKey()
-                            if (pub != null) {
-                                ApiClient.service().registerBiometricKey(
-                                    BiometricKeyRequest(BiometricSigningKey.publicKeyPem(pub))
-                                )
-                            }
-                            state = runCatching {
+                            state = Result.success(
                                 ApiClient.service().getCredential(id, challenge.challengeToken, signatureB64)
-                            }
+                            )
                             authenticated = true
                         } catch (e: Exception) {
-                            authError = "Verification failed: ${userMessage(e)}"
+                            if (revealNeedsKeyEnrolment(e)) {
+                                // No key on the server for this device (first use, or the key was regenerated):
+                                // ask for the password (and code) and enrol it, then run the step-up again.
+                                enrolError = null
+                                enrolNeedsCode = false
+                                showEnrol = true
+                            } else {
+                                // Includes 429 (reveal limit): the error screen shows the wait-and-retry message.
+                                state = Result.failure(e)
+                                authenticated = true
+                            }
                         }
                     }
                 }
@@ -107,6 +116,43 @@ fun CredentialDetailScreen(id: Int, navController: NavController) {
                 .build()
             prompt.authenticate(info, crypto)
         }
+    }
+
+    fun submitEnrol(password: String, code: String?) {
+        scope.launch {
+            enrolBusy = true
+            enrolError = null
+            try {
+                val pub = BiometricSigningKey.getOrCreatePublicKey()
+                if (pub == null) {
+                    showEnrol = false
+                    authError = "Biometric key unavailable on this device"
+                    return@launch
+                }
+                ApiClient.service().registerBiometricKey(
+                    BiometricKeyRequest(BiometricSigningKey.publicKeyPem(pub), password, code)
+                )
+                showEnrol = false
+                authenticate()      // the key is accepted now; the first challenge was spent, so start a fresh one
+            } catch (e: Exception) {
+                when (val f = classifyEnrolFailure(e)) {
+                    is EnrolFailure.NeedsCode -> { enrolNeedsCode = true; enrolError = f.message }
+                    is EnrolFailure.WrongPassword -> enrolError = f.message
+                    is EnrolFailure.RateLimited -> enrolError = f.message
+                    is EnrolFailure.Other -> { showEnrol = false; authError = "Verification failed: ${userMessage(f.error)}" }
+                }
+            } finally {
+                enrolBusy = false
+            }
+        }
+    }
+
+    if (showEnrol) {
+        StepUpDialog(
+            needsCode = enrolNeedsCode, busy = enrolBusy, error = enrolError,
+            onSubmit = ::submitEnrol,
+            onDismiss = { showEnrol = false; enrolError = null }
+        )
     }
 
     fun load() {

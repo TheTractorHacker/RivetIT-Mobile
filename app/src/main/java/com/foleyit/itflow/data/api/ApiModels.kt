@@ -443,9 +443,18 @@ data class FcmTokenRequest(
     @com.google.gson.annotations.SerializedName("fcm_token") val fcmToken: String
 )
 
+/**
+ * Enrols / replaces the credential-reveal step-up key. The server requires the account password
+ * (and a TOTP or recovery code when the account has MFA). [totpCode] is null (omitted from the JSON)
+ * unless the server asked for it. The secrets are never stored and never appear in [toString].
+ */
 data class BiometricKeyRequest(
-    @com.google.gson.annotations.SerializedName("device_public_key_pem") val devicePublicKeyPem: String
-)
+    @com.google.gson.annotations.SerializedName("device_public_key_pem") val devicePublicKeyPem: String,
+    @com.google.gson.annotations.SerializedName("current_password") val currentPassword: String,
+    @com.google.gson.annotations.SerializedName("totp_code") val totpCode: String? = null
+) {
+    override fun toString(): String = "BiometricKeyRequest(<redacted>)"
+}
 
 // ── Create Ticket ────────────────────────────────────────────────────────────
 data class CreateTicketRequest(
