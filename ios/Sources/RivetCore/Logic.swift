@@ -157,8 +157,23 @@ public enum RivetError: Error, Equatable {
     case certificate
     case decoding(String)
     case unauthorized
+    /// HTTP 429, with the server's `Retry-After` seconds when it sent a number.
+    case rateLimited(retryAfter: Int?)
 
-    public var statusCode: Int? { if case .http(let s, _) = self { return s }; return nil }
+    public var statusCode: Int? {
+        switch self {
+        case .http(let s, _): return s
+        case .rateLimited: return 429
+        default: return nil
+        }
+    }
+}
+
+/// "Try again in ..." text for a 429, from the `Retry-After` seconds when the server sent them.
+public func rateLimitMessage(retryAfter: Int?) -> String {
+    guard let s = retryAfter, s > 0 else { return "Too many attempts. Try again in a few minutes." }
+    if s < 90 { return "Too many attempts. Try again in about a minute." }
+    return "Too many attempts. Try again in about \((s + 59) / 60) minutes."
 }
 
 public func userMessage(for error: Error) -> String {
@@ -174,6 +189,7 @@ public func userMessage(for error: Error) -> String {
         default: return "Something went wrong. Please try again."
         }
     case .some(.unauthorized): return "Your session has expired. Please sign in again."
+    case .some(.rateLimited(let retryAfter)): return rateLimitMessage(retryAfter: retryAfter)
     case .some(.network): return "Network error — check your connection and try again."
     case .some(.certificate): return "The server's certificate could not be verified."
     case .some(.invalidURL): return "That server address isn't valid."

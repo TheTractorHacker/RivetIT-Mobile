@@ -11,10 +11,11 @@ final class MockTransport: HTTPTransport, @unchecked Sendable {
     var status = 200
     var body = Data()
     var error: Error?
+    var headers: [String: String] = [:]
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
         if let error { throw error }
-        let resp = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        let resp = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!
         return (body, resp)
     }
 }
@@ -142,6 +143,67 @@ final class APIClientTests: XCTestCase {
         let t = MockTransport(); t.status = 403; t.body = Data(#"{"error":"Insufficient permissions"}"#.utf8)
         do { _ = try await APIClient(serverURL: server, token: "x", transport: t).kbArticles(); XCTFail("expected failure") }
         catch { XCTAssertEqual(error as? RivetError, .http(status: 403, message: "Insufficient permissions")) }
+    }
+
+    private func sentBody(_ t: MockTransport) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(t.requests[0].httpBody)) as? [String: Any])
+    }
+
+    func testKeyEnrolmentSendsPasswordAndOmitsCodeWhenNotNeeded() async throws {
+        let t = MockTransport(); t.body = Data(#"{"ok":true}"#.utf8)
+        try await APIClient(serverURL: server, token: "x", transport: t).registerBiometricKey(pem: "PEM", currentPassword: "hunter2")
+        XCTAssertEqual(t.requests[0].httpMethod, "PUT"); XCTAssertTrue(t.requests[0].url!.absoluteString.hasSuffix("/api/v1/me"))
+        let obj = try sentBody(t)
+        XCTAssertEqual(obj["device_public_key_pem"] as? String, "PEM")
+        XCTAssertEqual(obj["current_password"] as? String, "hunter2")
+        XCTAssertNil(obj["totp_code"])
+    }
+
+    func testKeyEnrolmentSendsCodeWhenGiven() async throws {
+        let t = MockTransport(); t.body = Data(#"{"ok":true}"#.utf8)
+        try await APIClient(serverURL: server, token: "x", transport: t).registerBiometricKey(pem: "PEM", currentPassword: "hunter2", totpCode: "123456")
+        XCTAssertEqual(try sentBody(t)["totp_code"] as? String, "123456")
+    }
+
+    func testKeyBodyNeverPrintsSecrets() {
+        let body = RegisterKeyBody(devicePublicKeyPem: "PEM", currentPassword: "hunter2", totpCode: "123456")
+        for text in [String(describing: body), String(reflecting: body), "\(body)"] {
+            XCTAssertFalse(text.contains("hunter2")); XCTAssertFalse(text.contains("123456"))
+        }
+    }
+
+    func testEnrolment401DoesNotSignOutAndMapsToPrompt() async {
+        let t = MockTransport(); t.status = 401; t.body = Data(#"{"error":"Current password is required to register a biometric key"}"#.utf8)
+        let client = APIClient(serverURL: server, token: "x", transport: t)
+        let flag = Flag(); client.onUnauthorized = { flag.set() }
+        do { try await client.registerBiometricKey(pem: "P", currentPassword: "bad"); XCTFail("expected failure") }
+        catch {
+            XCTAssertFalse(flag.value, "a wrong password is not an expired session")
+            guard case .wrongPassword = classifyEnrolFailure(error) else { return XCTFail("got \(classifyEnrolFailure(error))") }
+        }
+        t.body = Data(#"{"error":"MFA code required to register a biometric key"}"#.utf8)
+        do { try await client.registerBiometricKey(pem: "P", currentPassword: "ok"); XCTFail("expected failure") }
+        catch { guard case .needsCode = classifyEnrolFailure(error) else { return XCTFail("got \(classifyEnrolFailure(error))") } }
+    }
+
+    func testRateLimitUsesRetryAfter() async {
+        let t = MockTransport(); t.status = 429; t.headers = ["Retry-After": "600"]; t.body = Data(#"{"error":"Too many attempts. Try again later."}"#.utf8)
+        let client = APIClient(serverURL: server, token: "x", transport: t)
+        do { try await client.registerBiometricKey(pem: "P", currentPassword: "x"); XCTFail("expected failure") }
+        catch {
+            XCTAssertEqual(error as? RivetError, .rateLimited(retryAfter: 600))
+            XCTAssertEqual(classifyEnrolFailure(error), .rateLimited("Too many attempts. Try again in about 10 minutes."))
+        }
+        t.headers = [:]
+        do { _ = try await client.credential(id: 1, challengeToken: "c", signature: "s"); XCTFail("expected failure") }
+        catch { XCTAssertEqual(userMessage(for: error), "Too many attempts. Try again in a few minutes.") }
+    }
+
+    func testRevealKeyMissingTriggersEnrolment() {
+        XCTAssertTrue(revealNeedsKeyEnrolment(RivetError.http(status: 403, message: "No biometric key registered for this device")))
+        XCTAssertTrue(revealNeedsKeyEnrolment(RivetError.http(status: 403, message: "Biometric verification failed")))
+        XCTAssertFalse(revealNeedsKeyEnrolment(RivetError.http(status: 403, message: "Access denied")))
+        XCTAssertFalse(revealNeedsKeyEnrolment(RivetError.rateLimited(retryAfter: nil)))
     }
 
     func testUnauthorizedSignsOutOnlyWhenSignedIn() async {

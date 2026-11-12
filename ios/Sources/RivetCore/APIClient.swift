@@ -66,7 +66,7 @@ public final class APIClient: @unchecked Sendable {
     }
 
     @discardableResult
-    func perform(request: URLRequest) async throws -> Data {
+    func perform(request: URLRequest, signOutOn401: Bool = true) async throws -> Data {
         let data: Data, response: HTTPURLResponse
         do { (data, response) = try await transport.send(request) }
         catch let e as RivetError { throw e }
@@ -74,7 +74,11 @@ public final class APIClient: @unchecked Sendable {
         catch { throw RivetError.network(error.localizedDescription) }
 
         guard (200..<300).contains(response.statusCode) else {
-            if response.statusCode == 401, token != nil { onUnauthorized?() }
+            if response.statusCode == 401, token != nil, signOutOn401 { onUnauthorized?() }
+            if response.statusCode == 429 {
+                let retry = response.value(forHTTPHeaderField: "Retry-After").flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+                throw RivetError.rateLimited(retryAfter: retry)
+            }
             let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
             throw RivetError.http(status: response.statusCode, message: message)
         }
@@ -117,7 +121,14 @@ public final class APIClient: @unchecked Sendable {
 
 private struct Empty: Encodable {}
 private struct StatusBody: Encodable { var statusId: Int }
-private struct RegisterKeyBody: Encodable { var devicePublicKeyPem: String }
+/// `totpCode` is nil (and left out of the JSON) unless the server asked for it. Never logged or stored.
+struct RegisterKeyBody: Encodable, CustomStringConvertible, CustomDebugStringConvertible {
+    var devicePublicKeyPem: String
+    var currentPassword: String
+    var totpCode: String?
+    var description: String { "RegisterKeyBody(<redacted>)" }
+    var debugDescription: String { description }
+}
 
 public extension APIClient {
     // Auth & profile
@@ -219,9 +230,12 @@ public extension APIClient {
     /// Step 1 of revealing a credential: a fresh challenge from the server.
     func biometricChallenge() async throws -> BiometricChallenge { try await get("auth") }
 
-    /// Registers this device's signing key (idempotent; the server keeps one per user, like the Android app).
-    func registerBiometricKey(pem: String) async throws {
-        try await sendVoid("PUT", "me", body: RegisterKeyBody(devicePublicKeyPem: pem))
+    /// Registers this device's signing key. The server now needs the account password (and the TOTP / recovery code
+    /// on MFA accounts); a wrong or missing value is a 401 that does NOT sign the user out, and the key stays unaccepted.
+    func registerBiometricKey(pem: String, currentPassword: String, totpCode: String? = nil) async throws {
+        let body = RegisterKeyBody(devicePublicKeyPem: pem, currentPassword: currentPassword, totpCode: totpCode)
+        let request = try makeRequest("PUT", "me", body: AnyEncodable(body))
+        try await perform(request: request, signOutOn401: false)
     }
 
     /// Step 3: the credential with its secrets, proven by the signature over the challenge.

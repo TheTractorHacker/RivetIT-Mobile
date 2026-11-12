@@ -28,6 +28,9 @@ object ApiClient {
 
     var onUnauthorized: (() -> Unit)? = null
 
+    /** Marker header for calls whose 401 means "wrong password / code", not "session expired". */
+    const val KEEP_SESSION_ON_401 = "X-Keep-Session-On-401"
+
     fun init(serverUrl: String, token: String?, trustedCertSha: String? = null, context: Context? = null) {
         val cleanUrl = serverUrl.trimEnd('/')
         if (_serverUrl.isNotEmpty() && (_serverUrl != cleanUrl || _token != token)) clearCachedResponses()
@@ -133,7 +136,8 @@ object ApiClient {
             // 401 auto-logout
             .addInterceptor { chain ->
                 val response = chain.proceed(chain.request())
-                if (response.code == 401 && _token != null) {
+                // Step-up key enrolment answers 401 for a wrong password / missing code; that is not an expired session.
+                if (response.code == 401 && _token != null && chain.request().header(KEEP_SESSION_ON_401) == null) {
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         onUnauthorized?.invoke()
                     }
